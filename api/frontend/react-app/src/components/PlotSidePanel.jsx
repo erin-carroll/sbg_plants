@@ -140,7 +140,11 @@ function PlotSidePanel({ plotId, traits, granules, onClose }) {
               <Box sx={{ overflowX: 'auto', maxHeight: 320, overflowY: 'auto' }}>                <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      {['Trait', 'Value', 'Units', 'Date', 'Sample', 'Taxa'].map(h => (
+                      {[
+                        'Trait', 'Value', 'Units', 'Date', 'Sample', 'Taxa',
+                        'Veg/Cover type', 'Phenophase', 'FC class', 'FC %',
+                        'Canopy pos.', 'Plot veg type', 'Cover method',
+                      ].map(h => (
                         <TableCell key={h} sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</TableCell>
                       ))}
                     </TableRow>
@@ -148,12 +152,19 @@ function PlotSidePanel({ plotId, traits, granules, onClose }) {
                   <TableBody>
                     {traits.map((t, i) => (
                       <TableRow key={i} hover>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.trait) ? t.trait : '—'}</TableCell>
-                        <TableCell>{t.value != null  ? t.value  : '—'}</TableCell>
-                        <TableCell>{present(t.units) ? t.units  : '—'}</TableCell>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{dateStr(t.collection_date) ?? '—'}</TableCell>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.sample_name) ? t.sample_name : '—'}</TableCell>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.taxa) ? t.taxa : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.trait)              ? t.trait              : '—'}</TableCell>
+                        <TableCell>                                {t.value != null              ? t.value              : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.units)              ? t.units              : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{dateStr(t.collection_date)    ?? '—'                     }</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.sample_name)        ? t.sample_name        : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.taxa)               ? t.taxa               : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.veg_or_cover_type)  ? t.veg_or_cover_type  : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.phenophase)         ? t.phenophase         : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.sample_fc_class)    ? t.sample_fc_class    : '—'}</TableCell>
+                        <TableCell>                                {t.sample_fc_percent != null  ? t.sample_fc_percent  : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.canopy_position)    ? t.canopy_position    : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.plot_veg_type)      ? t.plot_veg_type      : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.subplot_cover_method) ? t.subplot_cover_method : '—'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
