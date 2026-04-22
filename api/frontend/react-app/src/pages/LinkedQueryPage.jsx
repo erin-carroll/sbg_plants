@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   Box, Stack, Button, CircularProgress, Alert,
   Typography, Divider, Paper, ToggleButtonGroup, ToggleButton,
+  Tooltip, IconButton,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -10,6 +11,9 @@ import {
   Download as DownloadIcon,
   GraphicEq as SpectraIcon,
   RestartAlt as ResetIcon,
+  ChevronLeft as CollapseIcon,
+  ChevronRight as ExpandIcon,
+  FilterList as FilterIcon,
 } from '@mui/icons-material';
 
 import Navbar from '../components/Navbar';
@@ -26,7 +30,9 @@ function LinkedQueryPage() {
   const q = useLinkedQuery();
   const clearDrawnRef = useRef(null);
 
+  const [filterCollapsed, setFilterCollapsed] = useState(false);
   const [extractDisabled, setExtractDisabled] = useState(false);
+
   const [downloadLoading, setDownloadLoading] = useState(false);
 
   const spectra = useSpectraExtraction(
@@ -81,68 +87,94 @@ function LinkedQueryPage() {
       <Navbar />
 
       {/* Two-column body — fills remaining height, each column scrolls independently */}
-      <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', mt: '56px' }}>
+      <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', mt: '56px', maxWidth: { xl: 1920 }, mx: 'auto', width: '100%' }}>
 
-        {/* Left — filter panel, scrollable */}
+        {/* Left — filter panel, collapsible */}
         <Box
           sx={{
-            width: 380,
+            width: filterCollapsed ? 48 : { md: 300, lg: 380, xl: 420 },
             flexShrink: 0,
             borderRight: 1,
             borderColor: 'divider',
-            overflowY: 'auto',
-            p: 2,
+            overflowY: filterCollapsed ? 'hidden' : 'auto',
+            overflowX: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            gap: 2,
+            transition: 'width 0.2s ease',
           }}
         >
-          <LinkedFilterPanel
-            campaignName={q.campaignName}
-            setCampaignName={q.setCampaignName}
-            traitFilters={q.traitFilters}
-            setTraitFilters={q.setTraitFilters}
-            granuleFilters={q.granuleFilters}
-            setGranuleFilters={q.setGranuleFilters}
-            geojsonContent={q.geojsonContent}
-            setGeojsonContent={q.setUploadedGeojson}
-            clearDrawnRef={clearDrawnRef}
-          />
+          {/* Collapse toggle — always visible */}
+          <Box sx={{ display: 'flex', justifyContent: filterCollapsed ? 'center' : 'flex-end', p: 0.5, flexShrink: 0 }}>
+            <Tooltip title={filterCollapsed ? 'Expand filters' : 'Collapse filters'} placement="right">
+              <IconButton size="small" onClick={() => setFilterCollapsed(v => !v)}>
+                {filterCollapsed ? <ExpandIcon /> : <CollapseIcon />}
+              </IconButton>
+            </Tooltip>
+          </Box>
 
-          <Divider />
+          {/* Filter content — hidden when collapsed */}
+          <Box sx={{ display: filterCollapsed ? 'none' : 'flex', flexDirection: 'column', gap: 2, px: 2, pb: 2, flex: 1, overflowY: 'auto' }}>
+            <LinkedFilterPanel
+              campaignName={q.campaignName}
+              setCampaignName={q.setCampaignName}
+              traitFilters={q.traitFilters}
+              setTraitFilters={q.setTraitFilters}
+              granuleFilters={q.granuleFilters}
+              setGranuleFilters={q.setGranuleFilters}
+              geojsonContent={q.geojsonContent}
+              setGeojsonContent={q.setUploadedGeojson}
+              clearDrawnRef={clearDrawnRef}
+            />
 
-          <Button
-            variant="contained"
-            startIcon={q.loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
-            onClick={q.handleApply}
-            disabled={q.loading}
-            fullWidth
-          >
-            Apply
-          </Button>
+            <Divider />
 
-          <Button
-            variant="contained"
-            color="secondary"
-            startIcon={<ResetIcon />}
-            onClick={() => { q.handleReset(); spectra.reset(); setExtractDisabled(false); clearDrawnRef?.current?.(); }}
-            disabled={q.loading}
-            fullWidth
-          >
-            Reset
-          </Button>
+            <Button
+              variant="contained"
+              startIcon={q.loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
+              onClick={q.handleApply}
+              disabled={q.loading}
+              fullWidth
+            >
+              Apply
+            </Button>
 
-          {hasResults && (
-            <Box>
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<ResetIcon />}
+              onClick={() => { q.handleReset(); spectra.reset(); setExtractDisabled(false); clearDrawnRef?.current?.(); }}
+              disabled={q.loading}
+              fullWidth
+            >
+              Reset
+            </Button>
+
+            {hasResults && (
               <Typography variant="body2" color="text.secondary">
                 {q.totalPlots} plots matched
               </Typography>
+            )}
+          </Box>
+
+          {/* Collapsed state — show filter icon as hint */}
+          {filterCollapsed && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, pt: 1 }}>
+              <Tooltip title="Filters" placement="right">
+                <FilterIcon fontSize="small" color="action" />
+              </Tooltip>
+              {hasResults && (
+                <Tooltip title={`${q.totalPlots} plots matched`} placement="right">
+                  <Typography variant="caption" color="primary" sx={{ writingMode: 'vertical-rl', fontSize: 10 }}>
+                    {q.totalPlots}
+                  </Typography>
+                </Tooltip>
+              )}
             </Box>
           )}
         </Box>
 
-        {/* Right — map + side panel + table, scrollable */}
-        <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {/* Right — map + table, scrollable. position:relative so side panel can overlay */}
+        <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2, position: 'relative' }}>
 
           {q.error && (
             <Alert severity="error" onClose={() => q.setError(null)}>{q.error}</Alert>
@@ -166,11 +198,19 @@ function LinkedQueryPage() {
             <Alert severity="info">No plots matched your filters.</Alert>
           )}
 
-          {/* Main area: [map+table] beside [side panel] */}
-          <Stack direction="row" spacing={2} alignItems="flex-start">
+          {/* Main content */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Plot detail panel — shown above map when a plot is selected */}
+            {q.selectedPlotId && (
+              <PlotSidePanel
+                plotId={q.selectedPlotId}
+                traits={q.selectedTraits}
+                granules={q.selectedGranules}
+                onClose={() => q.setSelectedPlotId(null)}
+              />
+            )}
 
-            {/* Left: map then action bar then table stacked */}
-            <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <MapView
                 mapData={q.mapData}
                 filterData={q.filterMapData}
@@ -181,54 +221,53 @@ function LinkedQueryPage() {
                 onShapeDrawn={q.setDrawnGeojson}
                 clearDrawnRef={clearDrawnRef}
                 drawnShape={q.geojsonContent && q.geojsonIsDrawn ? q.geojsonContent : null}
+                height={420}
               />
 
               {/* Action bar — between map and table */}
               {hasResults && (
                 <Paper elevation={1} sx={{ px: 2, py: 1.5 }}>
-                  <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                  {/* Row 1 — pagination */}
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                     <Button size="small" variant="outlined" startIcon={<PrevIcon />}
                       onClick={q.handlePrev} disabled={!hasPrev || q.loading}>
                       Prev
                     </Button>
-                    <Typography variant="body2" color="text.secondary" sx={{ minWidth: 160, textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ flex: 1, textAlign: 'center' }}>
                       {q.displayedOffset + 1}–{Math.min(q.displayedOffset + q.limit, q.totalPlots)} of {q.totalPlots} plots
                     </Typography>
                     <Button size="small" variant="outlined" endIcon={<NextIcon />}
                       onClick={q.handleNext} disabled={!hasNext || q.loading}>
                       Next
                     </Button>
-
-                    <Box sx={{ flex: 1 }} />
-
-                    {/* Pixel count display */}
+                  </Stack>
+                  {/* Row 2 — pixel count + actions */}
+                  <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                     {q.hasQueried && (
-                      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', mr: 1 }}>
                         {q.pagePixelCount.toLocaleString()} px (page) /{' '}
                         {q.pixelCountLoading ? '…' : (q.totalPixelCount ?? 0).toLocaleString()} px (total)
                       </Typography>
                     )}
-
-                    {/* Radiance / Reflectance toggle */}
+                    <Box sx={{ flex: 1 }} />
                     <ToggleButtonGroup
                       value={spectra.spectraType}
                       exclusive
                       onChange={(_, v) => { if (v) spectra.setSpectraType(v); }}
                       size="small"
                     >
-                      <ToggleButton value="radiance"     sx={{ textTransform: 'none', fontSize: 12 }}>Radiance</ToggleButton>
-                      <ToggleButton value="reflectance"  sx={{ textTransform: 'none', fontSize: 12 }}>Reflectance</ToggleButton>
+                      <ToggleButton value="radiance"    sx={{ textTransform: 'none', fontSize: 12 }}>Radiance</ToggleButton>
+                      <ToggleButton value="reflectance" sx={{ textTransform: 'none', fontSize: 12 }}>Reflectance</ToggleButton>
                     </ToggleButtonGroup>
-
-                     <Button variant="contained" size="small" color="secondary" startIcon={<SpectraIcon />}
-                       onClick={spectra.handleExtractSpectra}
-                       disabled={extractDisabled || spectra.isPolling || !q.hasQueried}>
+                    <Button variant="contained" size="small" color="secondary" startIcon={<SpectraIcon />}
+                      onClick={spectra.handleExtractSpectra}
+                      disabled={extractDisabled || spectra.isPolling || !q.hasQueried}>
                       Extract Spectra
                     </Button>
-                     <Button variant="contained" size="small" startIcon={downloadLoading ? <CircularProgress size={14} color="inherit" /> : <DownloadIcon />}
-                       onClick={handleDownloadCSV} disabled={downloadLoading || !q.hasQueried}>
-                       Download CSV{q.totalCsvRows != null ? ` (${q.totalCsvRows.toLocaleString()} rows)` : q.hasQueried ? ' (…)' : ''}
-                     </Button>
+                    <Button variant="contained" size="small" startIcon={downloadLoading ? <CircularProgress size={14} color="inherit" /> : <DownloadIcon />}
+                      onClick={handleDownloadCSV} disabled={downloadLoading || !q.hasQueried}>
+                      Download CSV{q.totalCsvRows != null ? ` (${q.totalCsvRows.toLocaleString()} rows)` : q.hasQueried ? ' (…)' : ''}
+                    </Button>
                   </Stack>
                 </Paper>
               )}
@@ -248,19 +287,7 @@ function LinkedQueryPage() {
                 />
               )}
             </Box>
-
-            {/* Right: side panel — sticky so it stays in view while scrolling */}
-            {q.selectedPlotId && (
-              <Box sx={{ position: 'sticky', top: 0, alignSelf: 'flex-start', flexShrink: 0 }}>
-                <PlotSidePanel
-                  plotId={q.selectedPlotId}
-                  traits={q.selectedTraits}
-                  granules={q.selectedGranules}
-                  onClose={() => q.setSelectedPlotId(null)}
-                />
-              </Box>
-            )}
-          </Stack>
+          </Box>
         </Box>
       </Box>
     </Box>
