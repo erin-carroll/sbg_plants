@@ -2,10 +2,12 @@ import { useState, useMemo } from 'react';
 import { fetchParquet } from '../utils/api';
 import { parseFilters, summarizeValue, extractPixelIds, toRanges } from '../utils/helpers';
 import { SELECT_CONFIGS } from '../viewConfig';
+import { useSchema } from '../context/SchemaContext';
 
 const PAGE_SIZE = 4000;
 
 export function useDataQuery(view) {
+  const { schema } = useSchema();
   const [filterValues, setFilterValues]   = useState({});
   const [geojsonFile, setGeojsonFile]       = useState(null);
   const [geojsonContent, setGeojsonContent] = useState(null);
@@ -92,7 +94,7 @@ export function useDataQuery(view) {
     setOffset(0);
     try {
       const filters = parseFilters(filterValues, geojsonContent);
-      const result = await fetchParquet(view, filters, PAGE_SIZE, 0);
+      const result = await fetchParquet(view, filters, PAGE_SIZE, 0, schema);
       _applyResult(result, 0, true);
     } catch (err) {
       setError(err.message);
@@ -107,7 +109,7 @@ export function useDataQuery(view) {
     const newOffset = offset + PAGE_SIZE;
     try {
       const filters = parseFilters(filterValues, geojsonContent);
-      const result = await fetchParquet(view, filters, PAGE_SIZE, newOffset);
+      const result = await fetchParquet(view, filters, PAGE_SIZE, newOffset, schema);
       _applyResult(result, newOffset, false);
       setOffset(newOffset);
     } catch (err) {
@@ -119,7 +121,7 @@ export function useDataQuery(view) {
 
   const getPixelRanges = async () => {
     const filters = parseFilters(filterValues, geojsonContent);
-    const result = await fetchParquet(view, filters);
+    const result = await fetchParquet(view, filters, null, 0, schema);
     const pixelIds = extractPixelIds(result.data, SELECT_CONFIGS[view]);
     if (Object.keys(pixelIds).length === 0) throw new Error('No pixel IDs found');
     return Object.fromEntries(

@@ -1,11 +1,13 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { fetchLinkedQuery, fetchLinkedQueryAll } from '../utils/api';
 import { toRanges } from '../utils/helpers';
+import { useSchema } from '../context/SchemaContext';
 
 /**
  * All state and logic for LinkedQueryPage.
  */
 export function useLinkedQuery() {
+  const { schema } = useSchema();
   // -------------------------------------------------------------------------
   // Filter state
   // -------------------------------------------------------------------------
@@ -30,6 +32,7 @@ export function useLinkedQuery() {
     collection_date_end:   '',
   });
   const [granuleFilters, setGranuleFilters] = useState({
+    granule_id:             '',
     sensor_name:            [],
     cloudy_conditions:      [],
     cloud_type:             [],
@@ -110,6 +113,11 @@ export function useLinkedQuery() {
     if (Object.keys(tf).length)                    payload.trait_filters   = tf;
 
     const gf = {};
+    if (granuleFilters.granule_id) {
+      const ids = granuleFilters.granule_id.split(',').map(s => s.trim()).filter(Boolean);
+      if (ids.length === 1) gf.granule_id = ids[0];
+      else if (ids.length > 1) gf.granule_id = ids;
+    }
     if (granuleFilters.sensor_name?.length)         gf.sensor_name            = granuleFilters.sensor_name;
     if (granuleFilters.cloudy_conditions?.length)   gf.cloudy_conditions      = granuleFilters.cloudy_conditions;
     if (granuleFilters.cloud_type?.length)          gf.cloud_type             = granuleFilters.cloud_type;
@@ -117,8 +125,10 @@ export function useLinkedQuery() {
     if (granuleFilters.acquisition_date_end)         gf.acquisition_date_end   = granuleFilters.acquisition_date_end;
     if (Object.keys(gf).length)                      payload.granule_filters   = gf;
 
+    if (schema !== 'production') payload.schema = schema;
+
     return payload;
-  }, [campaignName, geojsonContent, traitFilters, granuleFilters, limit, offset]);
+  }, [campaignName, geojsonContent, traitFilters, granuleFilters, limit, offset, schema]);
 
   // -------------------------------------------------------------------------
   // Execute query
@@ -203,6 +213,7 @@ export function useLinkedQuery() {
       collection_date_start: '', collection_date_end: '',
     });
     setGranuleFilters({
+      granule_id: '',
       sensor_name: [], cloudy_conditions: [], cloud_type: [],
       acquisition_date_start: '', acquisition_date_end: '',
     });
@@ -226,6 +237,11 @@ export function useLinkedQuery() {
     allGranulesCache.current = null;
     allTraitsCache.current = null;
   }, []);
+
+  // Reset results when schema changes so stale data from the other schema is never shown
+  useEffect(() => {
+    handleReset();
+  }, [schema]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleApply = useCallback(() => {
     console.log('[useLinkedQuery] handleApply called');

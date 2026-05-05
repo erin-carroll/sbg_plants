@@ -7,6 +7,7 @@ import App from './App';
 import './styles.css';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { SchemaProvider } from './context/SchemaContext';
 
 const theme = createTheme({
   palette: {
@@ -26,7 +27,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <App />
+          <SchemaProvider>
+            <App />
+          </SchemaProvider>
         </ThemeProvider>
       </LocalizationProvider>
     </BrowserRouter>

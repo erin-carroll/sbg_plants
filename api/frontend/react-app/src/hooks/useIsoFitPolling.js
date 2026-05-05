@@ -6,7 +6,7 @@ import { pollJobStatus } from '../utils/api';
  * Only polls on an interval when isPolling is explicitly true.
  * Derived status is based on the summary data, not the polling state.
  */
-export function useIsoFitPolling(parentJobId, isPolling, pollInterval = 60000) {
+export function useIsoFitPolling(parentJobId, isPolling, pollInterval = 60000, onComplete) {
   const [jobData, setJobData]       = useState(null);
   const [pollingError, setPollingError] = useState(null);
   const [lastUpdated, setLastUpdated]   = useState(null);
@@ -50,6 +50,7 @@ export function useIsoFitPolling(parentJobId, isPolling, pollInterval = 60000) {
       const allTerminal = statuses.length > 0 && statuses.every(s => s === 'complete' || s === 'failed');
       if (allTerminal || (result.total_pixels_remaining === 0 && !result.restart_required)) {
         stopPolling();
+        onComplete?.();
       }
     };
 
@@ -57,9 +58,11 @@ export function useIsoFitPolling(parentJobId, isPolling, pollInterval = 60000) {
     return stopPolling;
   }, [isPolling, parentJobId, pollInterval, stopPolling, fetchOnce]);
 
-  // Derive status purely from data
+  // Derive status — prefer parent_status from backend if promoted
   const deriveStatus = () => {
     if (!jobData) return 'loading';
+    if (jobData.parent_status === 'promoted') return 'promoted';
+    if (jobData.parent_status === 'deleted')  return 'deleted';
     if (jobData.total_pixels_remaining === 0 && !jobData.restart_required) return 'complete';
     const statuses = Object.keys(jobData.statuses || {});
     if (statuses.length > 0 && statuses.every(s => s === 'failed')) return 'failed';
@@ -70,7 +73,7 @@ export function useIsoFitPolling(parentJobId, isPolling, pollInterval = 60000) {
   };
 
   const derivedStatus = deriveStatus();
-  const isComplete    = derivedStatus === 'complete';
+  const isComplete    = derivedStatus === 'complete' || derivedStatus === 'promoted';
   const canPoll = derivedStatus === 'in_progress' || derivedStatus === 'submitted';
 
   return { jobData, pollingError, lastUpdated, isComplete, canPoll, derivedStatus, stopPolling, fetchOnce };

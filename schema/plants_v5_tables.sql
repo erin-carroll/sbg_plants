@@ -10,14 +10,14 @@ CREATE TABLE vswir_plants.campaign (
 -- doi table, neon dois change on a yearly basis
 -- one campaign many dois
 -- what level do we integrate dois, campaign, trait etc
-CREATE TABLE vswir_plants.doi (
-    doi VARCHAR PRIMARY KEY,
-    campaign_name VARCHAR NOT NULL,
-    CONSTRAINT doi_campaign_key FOREIGN KEY (campaign_name)
-        REFERENCES vswir_plants.campaign(campaign_name)
-        ON DELETE CASCADE,
-    CONSTRAINT sensor_campaign_pk PRIMARY KEY (doi)
-);
+-- CREATE TABLE vswir_plants.doi (
+--     doi VARCHAR PRIMARY KEY,
+--     campaign_name VARCHAR NOT NULL,
+--     CONSTRAINT doi_campaign_key FOREIGN KEY (campaign_name)
+--         REFERENCES vswir_plants.campaign(campaign_name)
+--         ON DELETE CASCADE,
+--     CONSTRAINT sensor_campaign_pk PRIMARY KEY (doi)
+-- );
 
 -- elevation source does it need a version?
 CREATE TABLE vswir_plants.sensor_campaign (
@@ -26,6 +26,7 @@ CREATE TABLE vswir_plants.sensor_campaign (
     elevation_source vswir_plants."ELEVATION_source" NOT NULL,
     wavelength_center FLOAT4[] NOT NULL,
     fwhm FLOAT4[] NOT NULL,
+    -- rcc FLOAT4[] can be null?
     CONSTRAINT sensor_campaign_fkey FOREIGN KEY (campaign_name)
         REFERENCES vswir_plants.campaign(campaign_name)
         ON DELETE CASCADE,
@@ -43,8 +44,8 @@ CREATE TABLE vswir_plants.plot (
         ON DELETE CASCADE
 );
 
--- a column to specify map space and raw space
--- switch cloud condtion columns to use percentage and translate neon data to use that
+-- a column to specify map space and raw space?
+-- switch cloud condition columns to use percentage and translate neon data to use that
 -- confidence on alignment column, categorical so this would require an enum
 -- remove raster_epsg everything has to be wgs 84/ epsg 4326?
 CREATE TABLE vswir_plants.granule (
@@ -66,6 +67,7 @@ CREATE TABLE vswir_plants.granule (
 );
 
 -- Switch plot shape geom to be Geometry 4326, no performance impact, and works with current api. Supports only points and polygons
+-- should we allow points? or convert points to polygons? This might cause issues with overlap operations. We would need some kind of buffer?
 -- 1 plot can have many shapes?
 CREATE TABLE vswir_plants.plot_shape ( 
     plot_shape_id SERIAL PRIMARY KEY,
@@ -114,15 +116,17 @@ CREATE TABLE vswir_plants.pixel (
     aspect FLOAT4 NOT NULL,
     utc_time FLOAT4 NOT NULL,
     cosine_i FLOAT4 NOT NULL,
-    raw_cosine_i FLOAT4, -- needs to be not null in the future?
+    -- raw_cosine_i FLOAT4, -- needs to be not null in the future? remove
     lon FLOAT4 NOT NULL, 
     lat FLOAT4 NOT NULL,
+    -- geom geometry(POINT, 4326) NOT NULL, -- point, or polygon with buffer based on gsd assuming this is pixel center
     elevation FLOAT4 NOT NULL,
     CONSTRAINT pixel_fkey FOREIGN KEY (plot_id, granule_id)
         REFERENCES vswir_plants.plot_raster_intersect(plot_id, granule_id)
         ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX pixel_idx ON vswir_plants.pixel (plot_id, granule_id, glt_row, glt_column);
+CREATE INDEX pixel_geom_idx ON vswir_plants.pixel USING GIST (geom);
 
 
 -- should I merge this into the pixel table?
@@ -212,10 +216,10 @@ CREATE TABLE vswir_plants.leaf_traits (
 -- move things from traits to trait protocols?
 -- make a seperate table for trait methods which have protocols, this could be linked to the doi table??
 -- link back to the trait table
-CREATE TABLE vswir_plants.leaf_trait_protocols (
-    doi VARCHAR,
-    CONSTRAINT leaf_trait_protocol_doi_key FOREIGN KEY (doi)
-        REFERENCES vswir_plants.doi(doi)
-        ON DELETE CASCADE,
-    CONSTRAINT sensor_campaign_pk PRIMARY KEY(doi)
-);
+-- CREATE TABLE vswir_plants.leaf_trait_protocols (
+--     doi VARCHAR,
+--     CONSTRAINT leaf_trait_protocol_doi_key FOREIGN KEY (doi)
+--         REFERENCES vswir_plants.doi(doi)
+--         ON DELETE CASCADE,
+--     CONSTRAINT sensor_campaign_pk PRIMARY KEY(doi)
+-- );

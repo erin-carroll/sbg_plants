@@ -64,3 +64,8 @@ variable "cognito_client_id" {
   description = "Cognito App Client ID for JWT authorizer audience"
   type        = string
 }
+
+variable "job_status_ecr_image" {
+  description = "ECR image URI for the job status Lambda"
+  type        = string
+}

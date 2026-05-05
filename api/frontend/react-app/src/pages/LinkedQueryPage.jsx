@@ -21,7 +21,8 @@ import MapView from '../components/MapView';
 import LinkedFilterPanel from '../components/LinkedFilterPanel';
 import PlotSidePanel from '../components/PlotSidePanel';
 import LinkedDataTable from '../components/LinkedDataTable';
-import JobStatus from '../components/JobStatus';
+import SpectraJobStatus from '../components/SpectraJobStatus';
+import StagingToggle from '../components/StagingToggle';
 
 import { useLinkedQuery } from '../hooks/useLinkedQuery';
 import { useSpectraExtraction } from '../hooks/useSpectraExtraction';
@@ -114,6 +115,8 @@ function LinkedQueryPage() {
 
           {/* Filter content — hidden when collapsed */}
           <Box sx={{ display: filterCollapsed ? 'none' : 'flex', flexDirection: 'column', gap: 2, px: 2, pb: 2, flex: 1, overflowY: 'auto' }}>
+            <StagingToggle />
+
             <LinkedFilterPanel
               campaignName={q.campaignName}
               setCampaignName={q.setCampaignName}
@@ -262,7 +265,7 @@ function LinkedQueryPage() {
                     <Button variant="contained" size="small" color="secondary" startIcon={<SpectraIcon />}
                       onClick={spectra.handleExtractSpectra}
                       disabled={extractDisabled || spectra.isPolling || !q.hasQueried}>
-                      Extract Spectra
+                      Extract Spectra{q.totalPixelCount ? ` (${q.totalPixelCount.toLocaleString()} px)` : ''}
                     </Button>
                     <Button variant="contained" size="small" startIcon={downloadLoading ? <CircularProgress size={14} color="inherit" /> : <DownloadIcon />}
                       onClick={handleDownloadCSV} disabled={downloadLoading || !q.hasQueried}>
@@ -273,7 +276,7 @@ function LinkedQueryPage() {
               )}
 
               {/* Job status — above table */}
-              <JobStatus
+              <SpectraJobStatus
                 jobsBySensor={spectra.jobsBySensor ?? {}}
                 sensorStatuses={spectra.sensorStatuses ?? {}}
               />

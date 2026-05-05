@@ -132,7 +132,8 @@ CREATE TYPE vswir_plants."VEG_or_cover_type" AS ENUM (
     'PV',
     'Water',
     'Herbaceous clip strip - NEON',
-    'Woody individual'
+    'Woody individual',
+    -- 'Herbaceous aggregate sample'
 ); 
 
 CREATE TYPE vswir_plants."PLANT_status" AS ENUM (

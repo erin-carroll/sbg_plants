@@ -154,6 +154,33 @@ CREATE TABLE vswir_plants_staging.extracted_spectra (
         ON DELETE CASCADE
 );
 
+-- ── output_pixel_rfl (staging) ───────────────────────────────────────────────
+--
+-- Holds isofit-derived reflectance until reviewed and promoted to production.
+-- job_id scopes rows to a specific parent job so multiple jobs processing the
+-- same pixels do not overwrite each other in staging.
+
+CREATE TABLE vswir_plants_staging.output_pixel_rfl (
+    pixel_id    INTEGER       NOT NULL,
+    job_id      VARCHAR       NOT NULL,
+    reflectance FLOAT4[]      NOT NULL,
+    CONSTRAINT staging_output_pixel_rfl_pk PRIMARY KEY (pixel_id, job_id)
+);
+
+-- ── output_pixel_data_products (staging) ──────────────────────────────────────
+--
+-- Same pattern — holds algorithm-derived data products before promotion.
+
+CREATE TABLE vswir_plants_staging.output_pixel_data_products (
+    pixel_id             INTEGER                          NOT NULL,
+    job_id               VARCHAR                          NOT NULL,
+    fc_class             vswir_plants."FRACTIONAL_class",
+    fc_percentage        FLOAT4                           NOT NULL,
+    canopy_water_content FLOAT4                           NOT NULL,
+    uncertainty_cwc      FLOAT4                           NOT NULL,
+    CONSTRAINT staging_output_pixel_data_products_pk PRIMARY KEY (pixel_id, job_id)
+);
+
 -- ── insitu_plot_event ─────────────────────────────────────────────────────────
 
 CREATE TABLE vswir_plants_staging.insitu_plot_event (

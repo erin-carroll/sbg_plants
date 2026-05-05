@@ -10,8 +10,8 @@ def lambda_handler(event, context):
     qs     = event.get("queryStringParameters") or {}
     job_id = (event.get("pathParameters") or {}).get("job_id")
 
-    # GET /isofit_jobs
-    if path.rstrip("/").endswith("/isofit_jobs"):
+    # GET /data_product_jobs
+    if path.rstrip("/").endswith("/data_product_jobs"):
         return isofit.list_jobs(event)
 
     if not job_id:
@@ -20,6 +20,10 @@ def lambda_handler(event, context):
     # GET /job_status/{id}?mode=summary
     if qs.get("mode") == "summary":
         return isofit.job_summary(event, job_id)
+
+    # GET /job_status/{id}?mode=pixels
+    if qs.get("mode") == "pixels":
+        return isofit.job_pixels(event, job_id)
 
     # GET /job_status/{id}
     return single.job_status(event, job_id)

@@ -8,7 +8,8 @@ import {
   Search as SearchIcon,
   NavigateBefore as PrevIcon,
   NavigateNext as NextIcon,
-  PlayArrow as RunIcon,
+  Download as DownloadIcon,
+  GraphicEq as SpectraIcon,
   RestartAlt as ResetIcon,
   ChevronLeft as CollapseIcon,
   ChevronRight as ExpandIcon,
@@ -20,24 +21,82 @@ import MapView from '../components/MapView';
 import LinkedFilterPanel from '../components/LinkedFilterPanel';
 import PlotSidePanel from '../components/PlotSidePanel';
 import LinkedDataTable from '../components/LinkedDataTable';
-import IsoFitStatus from '../components/IsoFitStatus';
-import IsoFitHistory from '../components/IsoFitHistory';
+import SpectraJobStatus from '../components/SpectraJobStatus';
+import JobHistory from '../components/JobHistory';
+import AlgorithmPanel from '../components/AlgorithmPanel';
+import StagingToggle from '../components/StagingToggle';
 
 import { useLinkedQuery } from '../hooks/useLinkedQuery';
-import { useIsoFitJob } from '../hooks/useIsoFitJob';
+import { useAlgorithmJob } from '../hooks/useAlgorithmJob';
+import { useSpectraExtraction } from '../hooks/useSpectraExtraction';
+import { ALGORITHM_REGISTRY, DEFAULT_ALGORITHM } from '../config/algorithmConfig';
 
-function IsoFitPage() {
+function DataProductsPage() {
   const q = useLinkedQuery();
   const clearDrawnRef = useRef(null);
 
-  const [isoFitDisabled, setIsoFitDisabled] = useState(false);
-  const [filterCollapsed, setFilterCollapsed] = useState(false);
+  const [selectedAlgorithmKey, setSelectedAlgorithmKey] = useState(DEFAULT_ALGORITHM);
+  const [runDisabled,          setRunDisabled]           = useState(false);
+  const [filterCollapsed,      setFilterCollapsed]        = useState(false);
+  const [extractDisabled,      setExtractDisabled]        = useState(false);
+  const [downloadLoading,      setDownloadLoading]        = useState(false);
 
-  const isofit = useIsoFitJob(
+  const algorithm = ALGORITHM_REGISTRY[selectedAlgorithmKey];
+
+  const job = useAlgorithmJob(
+    algorithm,
     q.getPixelRanges,
     q.setError,
-    setIsoFitDisabled,
+    setRunDisabled,
   );
+
+  const spectra = useSpectraExtraction(
+    q.getPixelRanges,
+    q.setError,
+    setExtractDisabled,
+  );
+
+  const handleAlgorithmChange = (key) => {
+    setSelectedAlgorithmKey(key);
+    job.reset();
+    setRunDisabled(false);
+  };
+
+  const handleDownloadCSV = async () => {
+    setDownloadLoading(true);
+    try {
+      const rows = await q.getMergedDownloadData();
+      if (!rows.length) { q.setError('No data to download'); return; }
+      const cols = Object.keys(rows[0]);
+      const lines = [
+        cols.join(','),
+        ...rows.map(row =>
+          cols.map(c => {
+            const val = row[c];
+            if (val === null || val === undefined) return '';
+            const str = String(val);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+              return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+          }).join(',')
+        ),
+      ].join('\n');
+      const blob = new Blob(['\uFEFF' + lines], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'linked_query.csv';
+      document.body.appendChild(link);
+      link.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    } catch (err) {
+      q.setError(err.message ?? 'Download failed');
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
 
   const hasResults = q.totalPlots > 0 || q.traits.length > 0 || q.granules.length > 0;
   const hasPrev    = q.offset > 0;
@@ -51,7 +110,6 @@ function IsoFitPage() {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <Navbar />
 
-      {/* Two-column body */}
       <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', mt: '56px', maxWidth: { xl: 1920 }, mx: 'auto', width: '100%' }}>
 
         {/* Left — filter panel, collapsible */}
@@ -77,6 +135,8 @@ function IsoFitPage() {
           </Box>
 
           <Box sx={{ display: filterCollapsed ? 'none' : 'flex', flexDirection: 'column', gap: 2, px: 2, pb: 2, flex: 1, overflowY: 'auto' }}>
+            <StagingToggle />
+
             <LinkedFilterPanel
               campaignName={q.campaignName}
               setCampaignName={q.setCampaignName}
@@ -105,7 +165,14 @@ function IsoFitPage() {
               variant="contained"
               color="secondary"
               startIcon={<ResetIcon />}
-              onClick={() => { q.handleReset(); isofit.reset(); setIsoFitDisabled(false); clearDrawnRef?.current?.(); }}
+              onClick={() => {
+                q.handleReset();
+                job.reset();
+                spectra.reset();
+                setRunDisabled(false);
+                setExtractDisabled(false);
+                clearDrawnRef?.current?.();
+              }}
               disabled={q.loading}
               fullWidth
             >
@@ -135,27 +202,40 @@ function IsoFitPage() {
           )}
         </Box>
 
-        {/* Right — IsoFit panels + map + table */}
+        {/* Right — main content */}
         <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2, position: 'relative' }}>
 
-          {/* IsoFit job monitoring + history — always at top */}
-          <IsoFitStatus
-            parentJobId={isofit.isoFitJobId}
-            isPolling={isofit.isIsoFitPolling}
-            onStopPolling={() => isofit.setIsIsoFitPolling(false)}
-            onStartPolling={() => isofit.setIsIsoFitPolling(true)}
-            onClose={() => { isofit.setIsIsoFitPolling(false); isofit.setActiveJobId(null); }}
+          {/* Algorithm panel — dropdown + Run button + active job status */}
+          <AlgorithmPanel
+            selectedAlgorithmKey={selectedAlgorithmKey}
+            onAlgorithmChange={handleAlgorithmChange}
+            algorithm={algorithm}
+            job={job}
+            runDisabled={runDisabled || !q.hasQueried || !q.totalPixelCount}
+            totalPixelCount={q.totalPixelCount}
           />
-          <IsoFitHistory
-            activeJobId={isofit.isoFitJobId}
+
+          {/* Job history — inherits selected algorithm from AlgorithmPanel */}
+          <JobHistory
+            selectedAlgorithmKey={selectedAlgorithmKey}
+            activeJobId={job.activeJobId}
             onMonitor={(jobId) => {
-              isofit.setActiveJobId(jobId);
-              isofit.setIsIsoFitPolling(false);
+              job.setActiveJobId(jobId);
+              job.setIsPolling(false);
             }}
           />
 
           {q.error && (
             <Alert severity="error" onClose={() => q.setError(null)}>{q.error}</Alert>
+          )}
+
+          {Object.entries(spectra.sensorStatuses ?? {}).some(([, s]) => s.error) && (
+            <Alert severity="error">
+              {Object.entries(spectra.sensorStatuses)
+                .filter(([, s]) => s.error)
+                .map(([key, s]) => `${key}: ${s.error}`)
+                .join(' | ')}
+            </Alert>
           )}
 
           {q.loading && (
@@ -168,9 +248,7 @@ function IsoFitPage() {
             <Alert severity="info">No plots matched your filters.</Alert>
           )}
 
-          {/* Main content */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {/* Plot detail panel — shown above map when a plot is selected */}
             {q.selectedPlotId && (
               <PlotSidePanel
                 plotId={q.selectedPlotId}
@@ -194,7 +272,7 @@ function IsoFitPage() {
                 height={420}
               />
 
-              {/* Action bar */}
+              {/* Action bar — pagination + spectra extraction + download */}
               {hasResults && (
                 <Paper elevation={1} sx={{ px: 2, py: 1.5 }}>
                   {/* Row 1 — pagination */}
@@ -211,7 +289,8 @@ function IsoFitPage() {
                       Next
                     </Button>
                   </Stack>
-                  {/* Row 2 — pixel count + actions */}
+
+                  {/* Row 2 — pixel count + spectra + download */}
                   <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                     {q.hasQueried && (
                       <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', mr: 1 }}>
@@ -219,26 +298,35 @@ function IsoFitPage() {
                       </Typography>
                     )}
                     <Box sx={{ flex: 1 }} />
-                    <ToggleButtonGroup value="radiance" exclusive size="small">
-                      <ToggleButton value="radiance" sx={{ textTransform: 'none', fontSize: 12 }}>Radiance</ToggleButton>
-                      <ToggleButton value="reflectance" disabled sx={{ textTransform: 'none', fontSize: 12 }}>Reflectance</ToggleButton>
-                    </ToggleButtonGroup>
-                    <Button
-                      variant="contained"
+                    <ToggleButtonGroup
+                      value={spectra.spectraType}
+                      exclusive
+                      onChange={(_, v) => { if (v) spectra.setSpectraType(v); }}
                       size="small"
-                      color="error"
-                      startIcon={<RunIcon />}
-                      onClick={() => {
-                        if (!window.confirm('Are you sure you want to run ISOFIT?')) return;
-                        isofit.handleRunIsoFit();
-                      }}
-                      disabled={isoFitDisabled || isofit.isIsoFitPolling || !q.hasQueried}
                     >
-                      Run ISOFIT
+                      <ToggleButton value="radiance"    sx={{ textTransform: 'none', fontSize: 12 }}>Radiance</ToggleButton>
+                      <ToggleButton value="reflectance" sx={{ textTransform: 'none', fontSize: 12 }}>Reflectance</ToggleButton>
+                    </ToggleButtonGroup>
+                    <Button variant="contained" size="small" color="secondary" startIcon={<SpectraIcon />}
+                      onClick={spectra.handleExtractSpectra}
+                      disabled={extractDisabled || spectra.isPolling || !q.hasQueried}>
+                      Extract Spectra{q.totalPixelCount ? ` (${q.totalPixelCount.toLocaleString()} px)` : ''}
+                    </Button>
+                    <Button variant="contained" size="small"
+                      startIcon={downloadLoading ? <CircularProgress size={14} color="inherit" /> : <DownloadIcon />}
+                      onClick={handleDownloadCSV}
+                      disabled={downloadLoading || !q.hasQueried}>
+                      Download CSV{q.totalCsvRows != null ? ` (${q.totalCsvRows.toLocaleString()} rows)` : q.hasQueried ? ' (…)' : ''}
                     </Button>
                   </Stack>
                 </Paper>
               )}
+
+              {/* Spectra extraction job status */}
+              <SpectraJobStatus
+                jobsBySensor={spectra.jobsBySensor ?? {}}
+                sensorStatuses={spectra.sensorStatuses ?? {}}
+              />
 
               {hasResults && (
                 <LinkedDataTable
@@ -256,4 +344,4 @@ function IsoFitPage() {
   );
 }
 
-export default IsoFitPage;
+export default DataProductsPage;

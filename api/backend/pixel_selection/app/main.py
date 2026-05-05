@@ -12,11 +12,32 @@ from datetime import datetime, timezone
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-REGION         = os.environ.get("AWS_REGION", "us-west-2")
-JOB_QUEUE      = os.environ["BATCH_JOB_QUEUE"]
-JOB_DEFINITION = os.environ["BATCH_JOB_DEFINITION"]
-JOB_TABLE      = os.environ["DYNAMODB_TABLE"]
-BATCH_SIZE     = int(os.environ.get("BATCH_SIZE", "20"))
+REGION     = os.environ.get("AWS_REGION", "us-west-2")
+JOB_TABLE  = os.environ["DYNAMODB_TABLE"]
+BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "20"))
+
+# ---------------------------------------------------------------------------
+# Algorithm registry
+# ---------------------------------------------------------------------------
+# Each entry maps an algorithm name (passed in the request body) to the Batch
+# queue and job definition it should use, plus the DynamoDB job_type labels
+# used to track parent and child jobs.
+#
+# Adding a new algorithm:
+#   1. Add an entry here with its env vars, parent_job_type, child_job_type.
+#   2. Add the corresponding BATCH_JOB_QUEUE / BATCH_JOB_DEFINITION env vars
+#      to the pixel_selection Lambda in Terraform.
+#   3. Add its entry to pixel_output/promotion/promote.py PRODUCT_REGISTRY.
+#   4. Add its entry to the frontend ALGORITHM_REGISTRY in DataProductsPage.
+# ---------------------------------------------------------------------------
+ALGORITHM_REGISTRY = {
+    "isofit": {
+        "job_queue":       os.environ["BATCH_JOB_QUEUE"],
+        "job_definition":  os.environ["BATCH_JOB_DEFINITION"],
+        "parent_job_type": "isofit_parent",
+        "child_job_type":  "inversion",
+    },
+}
 
 batch    = boto3.client("batch", region_name=REGION)
 dynamodb = boto3.client("dynamodb", region_name=REGION)
@@ -93,6 +114,7 @@ def submit_job(
     campaign_name: str,
     sensor_name: str,
     granule_id: str,
+    algo_config: dict,
 ) -> str:
     job_id = str(uuid.uuid4())
     dynamodb.put_item(
@@ -101,7 +123,7 @@ def submit_job(
             "job_id":        {"S": job_id},
             "parent_job_id": {"S": parent_job_id},
             "status":        {"S": "submitted"},
-            "job_type":      {"S": "inversion"},
+            "job_type":      {"S": algo_config["child_job_type"]},
             "pixel_ids":     {"S": json.dumps(pixel_ids)},
             "pixel_count":   {"N": str(len(pixel_ids))},
             "batch_index":   {"N": str(batch_index)},
@@ -113,9 +135,9 @@ def submit_job(
     )
     try:
         response = batch.submit_job(
-            jobName=f"inversion-{job_id[:8]}",
-            jobQueue=JOB_QUEUE,
-            jobDefinition=JOB_DEFINITION,
+            jobName=f"{algo_config['child_job_type']}-{job_id[:8]}",
+            jobQueue=algo_config["job_queue"],
+            jobDefinition=algo_config["job_definition"],
             containerOverrides={
                 "environment": [
                     {"name": "PIXEL_IDS",      "value": ",".join(str(i) for i in pixel_ids)},
@@ -168,6 +190,11 @@ def lambda_handler(event, context):
              .get("cognito:username", "unknown")
     )
 
+    algorithm = body.get("algorithm", "isofit")
+    if algorithm not in ALGORITHM_REGISTRY:
+        return {"statusCode": 400, "body": json.dumps({"error": f"unknown algorithm '{algorithm}' — valid options: {list(ALGORITHM_REGISTRY)}"})}
+    algo_config = ALGORITHM_REGISTRY[algorithm]
+
     pixel_ranges = body.get("pixel_ranges")
     if not pixel_ranges or not isinstance(pixel_ranges, dict):
         return {"statusCode": 400, "body": json.dumps({"error": "missing or invalid pixel_ranges — expected { 'campaign|sensor': [[start, end], ...] }"})}
@@ -211,7 +238,8 @@ def lambda_handler(event, context):
         TableName=JOB_TABLE,
         Item={
             "job_id":        {"S": parent_job_id},
-            "job_type":      {"S": "isofit_parent"},
+            "job_type":      {"S": algo_config["parent_job_type"]},
+            "algorithm":     {"S": algorithm},
             "status":        {"S": "submitted"},
             "submitted_by":  {"S": submitted_by},
             "created_at":    {"S": created_at},
@@ -229,6 +257,7 @@ def lambda_handler(event, context):
                 campaign_name=campaign_name,
                 sensor_name=sensor_name,
                 granule_id=granule_id,
+                algo_config=algo_config,
             )
             job_ids.append(job_id)
             batch_index += 1

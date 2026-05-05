@@ -12,11 +12,45 @@ from app.query import execute_query, build_query
 from app.view_config import VIEW_CONFIG, get_selectable_columns
 from app.sqs import send_sqs
 from app.orchestration import run_linked_query
+from app.auth import get_claims, require_admin, handle_error
 
 
 logger = logging.getLogger("lambda_handler")
 logger.setLevel(logging.WARNING)
 
+
+# ---------------------------------------------------------------------------
+# Schema helpers
+# ---------------------------------------------------------------------------
+
+_VALID_SCHEMAS = {"production", "staging"}
+_SCHEMA_TO_PG = {
+    "production": "vswir_plants",
+    "staging":    "vswir_plants_staging",
+}
+
+
+def _resolve_schema(params: dict, event: dict) -> tuple[str, dict | None]:
+    schema = (params.get("schema") or "production").lower()
+    if schema not in _VALID_SCHEMAS:
+        return "vswir_plants", {
+            "statusCode": 400,
+            "body": json.dumps({"error": f"Invalid schema '{schema}'. Must be 'production' or 'staging'."}),
+        }
+    if schema == "staging":
+        try:
+            claims = get_claims(event)
+            logger.debug("cognito:groups raw value: %r", claims.get('cognito:groups', 'KEY_NOT_FOUND'))
+            logger.debug("all claim keys: %s", list(claims.keys()))
+            require_admin(claims)
+        except PermissionError as err:
+            return handle_error(err)
+    return _SCHEMA_TO_PG[schema], None
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _json_safe(obj):
     """json.dumps default= handler: NaN/Inf → None, dates → str."""
@@ -24,10 +58,6 @@ def _json_safe(obj):
         return None
     return str(obj)
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _parse_body(event):
     """Parse the POST body as JSON; return empty dict on missing/invalid body."""
@@ -109,8 +139,12 @@ def handle_linked_query(event):
     except ValueError as exc:
         return {"statusCode": 400, "body": json.dumps({"error": str(exc)})}
 
+    pg_schema, err = _resolve_schema(body, event)
+    if err:
+        return err
+
     try:
-        result = run_linked_query(body)
+        result = run_linked_query(body, schema=pg_schema)
     except ValueError as exc:
         return {"statusCode": 400, "body": json.dumps({"error": str(exc)})}
     except Exception as exc:
@@ -135,6 +169,10 @@ def handle_view_query(event, view_name):
             return {"statusCode": 400, "body": json.dumps({"error": str(exc)})}
     else:
         query_params = event.get("queryStringParameters") or {}
+
+    pg_schema, err = _resolve_schema(query_params, event)
+    if err:
+        return err
 
     debug = query_params.get("debug", False)
     if isinstance(debug, str):
@@ -192,6 +230,7 @@ def handle_view_query(event, view_name):
             limit=limit,
             offset=offset,
             filters=filters,
+            schema=pg_schema,
         )
     except Exception as exc:
         logger.exception("Query build error")
@@ -211,7 +250,7 @@ def handle_view_query(event, view_name):
         }
 
     try:
-        df = execute_query(view_name=view_name, sql=sql, params=params, debug=debug)
+        df = execute_query(view_name=view_name, sql=sql, params=params, debug=debug, schema=pg_schema)
     except Exception as exc:
         logger.exception("Database error")
         return {"statusCode": 500, "body": json.dumps({"error": f"Database error: {exc}"})}
@@ -228,7 +267,7 @@ def handle_view_query(event, view_name):
 # ---------------------------------------------------------------------------
 
 def lambda_handler(event, context):
-    path        = (event.get("path") or event.get("rawPath") or "").rstrip("/")
+    path        = (event.get("rawPath") or event.get("path") or "").rstrip("/")
     http_method = event.get("httpMethod", "GET").upper()
 
     logger.debug("Request: %s %s", http_method, path)

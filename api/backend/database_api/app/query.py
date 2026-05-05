@@ -8,11 +8,18 @@ from app.view_config import VIEW_CONFIG
 logger = logging.getLogger("lambda_handler")
 
 
-def build_query(view_name: str, select_statement: str, limit: int = None, offset: int = 0, filters: dict = None):
+def build_query(
+    view_name: str,
+    select_statement: str,
+    limit: int = None,
+    offset: int = 0,
+    filters: dict = None,
+    schema: str = "vswir_plants",
+):
     if view_name not in VIEW_CONFIG:
         raise ValueError(f"View '{view_name}' is not allowed.")
 
-    sql = f'SELECT {select_statement} FROM "{view_name}"'
+    sql = f'SELECT {select_statement} FROM "{schema}"."{view_name}"'
     params = []
 
     if filters:
@@ -31,15 +38,15 @@ def build_query(view_name: str, select_statement: str, limit: int = None, offset
         sql += " OFFSET %s"
         params.append(int(offset))
 
-    logger.debug("Built query for view: %s", view_name)
+    logger.debug("Built query for view: %s (schema: %s)", view_name, schema)
     logger.debug("SQL: %s", sql)
     logger.debug("Params: %s", params)
 
     return sql, params
 
 
-def execute_query(view_name: str, sql: str, params: list, debug: bool = False):
-    logger.debug("Executing query on view: %s", view_name)
+def execute_query(view_name: str, sql: str, params: list, debug: bool = False, schema: str = "vswir_plants"):
+    logger.debug("Executing query on view: %s (schema: %s)", view_name, schema)
     logger.debug("SQL: %s", sql)
     logger.debug("Params: %s", params)
 

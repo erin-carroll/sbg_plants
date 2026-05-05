@@ -32,7 +32,7 @@ export async function fetchLinkedQueryAll(payload) {
 /**
  * Fetch Parquet data from API
  */
-export async function fetchParquet(view, filters, limit = null, offset = 0) {
+export async function fetchParquet(view, filters, limit = null, offset = 0, schema = 'production', pathOverride = null) {
   const select = SELECT_CONFIGS[view];
   const payload = {
     view,
@@ -53,9 +53,14 @@ export async function fetchParquet(view, filters, limit = null, offset = 0) {
     payload.filters = validFilters;
   }
 
+  if (schema !== 'production') {
+    payload.schema = schema;
+  }
+
   let response;
   try {
-    response = await client.post(`/query/${view}`, payload, {
+    const endpoint = pathOverride ? `/query/${pathOverride}` : `/query/${view}`;
+    response = await client.post(endpoint, payload, {
       responseType: 'arraybuffer'
     });
   } catch (err) {
@@ -86,20 +91,24 @@ export async function fetchParquet(view, filters, limit = null, offset = 0) {
  * pixelRangesBySensor: { "campaign|sensor": pixelRanges }
  *   where pixelRanges is a list of [start, end] numeric ranges or a flat array of pixel_ids
  */
-export async function extractSpectra(pixelRangesBySensor, spectraType = 'radiance') {
+export async function extractSpectra(pixelRangesBySensor, spectraType = 'radiance', schema = 'production') {
   const view = spectraType === 'reflectance' ? 'reflectance_view' : 'extracted_spectra_view';
 
   const jobEntries = await Promise.all(
     Object.entries(pixelRangesBySensor).map(async ([sensorKey, pixelRanges]) => {
       const [campaign, sensor] = sensorKey.split('|');
 
-      // Both radiance and reflectance need wavelength/fwhm for column headers
-      const metadata = await fetchParquet('extracted_metadata_view', {
-        campaign_name: campaign,
-        sensor_name: sensor,
-      });
-
-      const [wavelength_center, fwhm] = metadata.data[0];
+      // Fetch wavelength/fwhm metadata as JSON (backend returns JSON for this view)
+      const metaRequest = {
+        view: 'extracted_metadata_view',
+        format: 'json',
+        select: ['wavelength_center', 'fwhm'],
+        filters: { campaign_name: campaign, sensor_name: sensor },
+      };
+      if (schema !== 'production') metaRequest.schema = schema;
+      const metaResponse = await client.post('/query/metadata', metaRequest);
+      const metaRows = metaResponse.data;
+      const { wavelength_center, fwhm } = metaRows[0];
 
       const payload = {
         view,
@@ -113,8 +122,66 @@ export async function extractSpectra(pixelRangesBySensor, spectraType = 'radianc
           spectral_column: spectraType === 'reflectance' ? 'reflectance' : 'radiance',
         },
       };
+      if (schema !== 'production') payload.schema = schema;
 
       const response = await client.post(`/query/${view}`, payload);
+      return [sensorKey, response.data.job_id];
+    })
+  );
+
+  return Object.fromEntries(jobEntries);
+}
+
+/**
+ * Fetch pixel IDs for a completed algorithm job, grouped by campaign|sensor.
+ * Returns: { "campaign|sensor": [pixel_id, ...], ... }
+ */
+export async function fetchJobPixelIds(parentJobId) {
+  const response = await client.get(`/job_status/${parentJobId}`, {
+    params: { mode: 'pixels' },
+  });
+  return response.data.pixels_by_sensor;
+}
+
+/**
+ * Submit a download job for a completed algorithm job.
+ * Fetches pixel IDs from DynamoDB, then submits one async worker job per
+ * campaign|sensor key via the existing SQS worker path.
+ *
+ * Returns: { "campaign|sensor": job_id, ... } — same shape as extractSpectra
+ */
+export async function downloadAlgorithmJobData(parentJobId, algorithm, schema = 'production') {
+  const pixelsBySensor = await fetchJobPixelIds(parentJobId);
+  const jobEntries = await Promise.all(
+    Object.entries(pixelsBySensor).map(async ([sensorKey, pixelIds]) => {
+      const [campaign, sensor] = sensorKey.split('|');
+
+      const metaRequest = {
+        view: 'extracted_metadata_view',
+        format: 'json',
+        select: ['wavelength_center', 'fwhm'],
+        filters: { campaign_name: campaign, sensor_name: sensor },
+      };
+      // this might need to change
+      if (schema !== 'production') metaRequest.schema = 'production';
+      const metaResponse = await client.post('/query/metadata', metaRequest);
+      const { wavelength_center, fwhm } = metaResponse.data[0];
+
+      const payload = {
+        view:    algorithm.downloadView,
+        format:  'parquet',
+        filters: { pixel_id: pixelIds },
+        metadata: {
+          campaign_name:   campaign,
+          sensor_name:     sensor,
+          wavelength_center,
+          fwhm,
+          spectral_column: algorithm.downloadSpectralColumn ?? 'reflectance',
+        },
+      };
+      if (schema !== 'production') payload.schema = schema;
+      console.log(schema, payload)
+      const response = await client.post(`/query/${algorithm.downloadView}`, payload);
       return [sensorKey, response.data.job_id];
     })
   );
@@ -163,8 +230,51 @@ export async function submitIsofitRun(payload) {
 }
 
 export async function listIsofitJobs(limit = 5) {
-  const response = await client.get('/isofit_jobs', { params: { limit } });
+  const response = await client.get('/data_product_jobs', {
+    params: { limit, job_type: 'isofit_parent' }
+  });
   return response.data.jobs;
+}
+
+/**
+ * Generic algorithm job submission — works for any entry in ALGORITHM_REGISTRY.
+ */
+export async function submitAlgorithmRun(algorithm, payload) {
+  const response = await client.post(algorithm.apiEndpoint, payload, { responseType: 'json' });
+  return response;
+}
+
+/**
+ * List recent parent jobs for any registered algorithm.
+ * Uses GET /data_product_jobs?job_type=<algorithm.jobType>
+ */
+export async function listAlgorithmJobs(algorithm, limit = 5) {
+  const response = await client.get('/data_product_jobs', {
+    params: { limit, job_type: algorithm.jobType },
+  });
+  return response.data.jobs;
+}
+
+/**
+ * Promote staging output rows for a completed job to production.
+ * POST /data_products/{productKey}/jobs/{jobId}/promote
+ */
+export async function promoteProductJob(productKey, jobId) {
+  const response = await client.post(
+    `/data_products/${productKey}/jobs/${jobId}/promote`
+  );
+  return response.data;
+}
+
+/**
+ * Delete staging rows for a job without promoting.
+ * DELETE /data_products/{productKey}/jobs/{jobId}
+ */
+export async function deleteAlgorithmJob(productKey, jobId) {
+  const response = await client.delete(
+    `/data_products/${productKey}/jobs/${jobId}`
+  );
+  return response.data;
 }
 
 // DynamoDB uses job_id as the primary key — normalize to batch_id for the frontend

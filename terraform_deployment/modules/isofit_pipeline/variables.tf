@@ -85,3 +85,8 @@ variable "config_bucket_arn" {
   description = "S3 bucket ARN for isofit app code and exports"
   type        = string
 }
+
+variable "pixel_output_promotion_ecr_image" {
+  description = "ECR image URI for the pixel output promotion Lambda container"
+  type        = string
+}

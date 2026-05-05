@@ -53,6 +53,7 @@ module "api" {
 
   cognito_user_pool_id = module.cognito.user_pool_id
   cognito_client_id    = module.cognito.user_pool_client_id
+  job_status_ecr_image = var.job_status_ecr_image
 }
 
 module "cognito" {
@@ -107,6 +108,7 @@ module "isofit_pipeline" {
   dynamodb_table_name       = module.api.export_jobs_table_name
   ecr_image                 = var.isofit_ecr_image
   pixel_selection_ecr_image = var.pixel_selection_ecr_image
+  pixel_output_promotion_ecr_image = var.pixel_output_promotion_ecr_image
   cognito_authorizer_id     = module.api.cognito_authorizer_id
   api_execution_arn         = module.api.api_execution_arn
   isofit_user               = var.isofit_user

@@ -656,16 +656,13 @@ resource "aws_iam_role_policy_attachment" "status_vpc_access" {
 resource "aws_lambda_function" "job_status" {
   function_name = "vswir-plants-job-status"
   role          = aws_iam_role.job_status_lambda_role.arn
-  handler       = "app.main.lambda_handler"
-  runtime       = "python3.11"
+  package_type  = "Image"
+  image_uri     = var.job_status_ecr_image
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
     security_group_ids = [aws_security_group.lambda_sg.id]
   }
-
-  filename         = "${path.module}/job_status.zip"
-  source_code_hash = filebase64sha256("${path.module}/job_status.zip")
 
   memory_size = 128
   timeout     = 30
@@ -699,7 +696,7 @@ resource "aws_apigatewayv2_route" "job_status_route" {
 
 resource "aws_apigatewayv2_route" "isofit_jobs_route" {
   api_id             = aws_apigatewayv2_api.vswir_plants.id
-  route_key          = "GET /isofit_jobs"
+  route_key          = "GET /data_product_jobs"
   target             = "integrations/${aws_apigatewayv2_integration.job_status.id}"
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
   authorization_type = "JWT"

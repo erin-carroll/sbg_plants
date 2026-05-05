@@ -86,6 +86,7 @@ function FeatureClickHandler({ mapData, onFeatureClick, resultKey }) {
       } catch { /* skip */ }
     });
     markerGroup.addTo(map);
+    markerGroup.bringToFront();
     markerLayerRef.current = markerGroup;
 
     // Update radius + polygon visibility on zoom
@@ -98,6 +99,7 @@ function FeatureClickHandler({ mapData, onFeatureClick, resultKey }) {
       } else {
         if (map.hasLayer(polyLayer)) map.removeLayer(polyLayer);
       }
+      markerGroup.bringToFront();
     };
     map.on('zoomend', onZoom);
 

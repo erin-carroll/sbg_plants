@@ -1,3 +1,4 @@
+import json
 import os
 import boto3
 from datetime import datetime, timezone
@@ -6,13 +7,13 @@ dynamodb = boto3.client("dynamodb", region_name=os.environ.get("AWS_REGION", "us
 JOB_TABLE = os.environ["JOB_TABLE"]
 
 
-def list_parent_jobs(limit: int) -> list[dict]:
-    """Query the job_type-index GSI for isofit_parent jobs, newest first."""
+def list_parent_jobs(limit: int, job_type: str = "isofit_parent") -> list[dict]:
+    """Query the job_type-index GSI for parent jobs of the given type, newest first."""
     resp = dynamodb.query(
         TableName=JOB_TABLE,
         IndexName="job_type-index",
         KeyConditionExpression="job_type = :t",
-        ExpressionAttributeValues={":t": {"S": "isofit_parent"}},
+        ExpressionAttributeValues={":t": {"S": job_type}},
         ScanIndexForward=False,
         Limit=limit,
     )
@@ -39,6 +40,30 @@ def query_child_jobs(parent_job_id: str) -> list[dict]:
     ):
         items.extend(page.get("Items", []))
     return items
+
+
+def get_parent_pixel_ids_by_sensor(parent_job_id: str) -> dict:
+    """
+    Collect all pixel IDs for a parent job, grouped by 'campaign|sensor' key.
+    Returns: { "campaign|sensor": [pixel_id, ...], ... }
+    """
+    items = query_child_jobs(parent_job_id)
+    grouped = {}
+    for item in items:
+        campaign = item.get("campaign_name", {}).get("S", "")
+        sensor   = item.get("sensor_name",   {}).get("S", "")
+        raw      = item.get("pixel_ids",     {}).get("S")
+        if not campaign or not sensor or not raw:
+            continue
+        key = f"{campaign}|{sensor}"
+        try:
+            ids = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if key not in grouped:
+            grouped[key] = []
+        grouped[key].extend(ids)
+    return grouped
 
 
 def get_job(job_id: str) -> dict | None:

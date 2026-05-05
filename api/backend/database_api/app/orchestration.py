@@ -13,6 +13,12 @@ Stage 4 : Parallel data queries for the page only (two separate DB connections):
 Granule queries use a CTE so the planner narrows granules BEFORE joining pixels.
 All filter clause building goes through build_where_clause / _build_array_in_clause
 — no hand-rolled SQL predicates.
+
+The 'schema' parameter accepted by run_linked_query (and threaded through all
+internal helpers) is a fully-qualified PostgreSQL schema name, e.g.:
+    "vswir_plants"          → production
+    "vswir_plants_staging"  → staging (admin+ only)
+Both are served by the same DB user (postgrest_user) which has SELECT on both.
 """
 
 import logging
@@ -56,25 +62,12 @@ def _remap_date_aliases(filters: dict, alias_map: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 def _trait_where(trait_filters: dict, plot_ids: list):
-    """
-    Build WHERE clause + params for trait_view scoped to plot_ids.
-    plot_id uses the 'array' type so build_where_clause emits plot_id = ANY(%s).
-    """
     filters = _remap_date_aliases(dict(trait_filters or {}), _TRAIT_DATE_ALIASES)
     filters["plot_id"] = plot_ids
     return build_where_clause("trait_view", filters)
 
 
-def _granule_cte_and_where(granule_filters: dict, plot_ids: list):
-    """
-    Return (cte_sql, where_sql, params) for the granule+pixel aggregation query.
-
-    The CTE narrows granule_view by any granule-column filters BEFORE the pixel
-    JOIN, so the planner touches only the relevant granule rows first.
-
-    pixel-side filter (px.plot_id = ANY(%s)) is appended after the CTE.
-    """
-    # Build granule-column WHERE via build_where_clause
+def _granule_cte_and_where(granule_filters: dict, plot_ids: list, schema: str):
     granule_fragment = ""
     granule_params: tuple = ()
     if granule_filters:
@@ -93,19 +86,16 @@ def _granule_cte_and_where(granule_filters: dict, plot_ids: list):
                 acquisition_start_time,
                 cloudy_conditions,
                 cloud_type
-            FROM vswir_plants.granule_view
+            FROM "{schema}".granule_view
             {"WHERE " + granule_fragment if granule_fragment else ""}
         )"""
 
-    # pixel-side clause
     px_clauses = []
     px_params  = []
     _build_array_in_clause("plot_id", plot_ids, px_clauses, px_params)
     pixel_fragment = px_clauses[0].replace('"plot_id"', 'px.plot_id')
 
-    # combined params: granule params bind into the CTE, pixel params into WHERE
     params = list(granule_params) + px_params
-
     return cte_sql, pixel_fragment, params
 
 
@@ -113,11 +103,7 @@ def _granule_cte_and_where(granule_filters: dict, plot_ids: list):
 # Stage 1 — spatial filter
 # ---------------------------------------------------------------------------
 
-def _stage1_plot_ids(geojson, campaign_name, conn):
-    """
-    Return all plot_ids matching the spatial + campaign filters.
-    Cheap: returns only integers via the GIST index on plot_shape.
-    """
+def _stage1_plot_ids(geojson, campaign_name, conn, schema: str):
     filters = {}
     if campaign_name:
         filters["campaign_name"] = campaign_name
@@ -125,36 +111,28 @@ def _stage1_plot_ids(geojson, campaign_name, conn):
         filters["geom"] = geojson
 
     where_clause, where_params = build_where_clause("plot_shape_view", filters)
-    sql = f"SELECT DISTINCT plot_id FROM vswir_plants.plot_shape_view{where_clause}"
+    sql = f'SELECT DISTINCT plot_id FROM "{schema}".plot_shape_view{where_clause}'
     logger.debug("Stage 1 SQL: %s", sql)
 
     df = pd.read_sql(sql, conn, params=list(where_params))
     return df["plot_id"].tolist()
 
 
-def _plot_ids_with_traits(plot_ids, trait_filters):
-    """
-    Narrow plot_ids to only those that have at least one matching trait row.
-    Opens its own connection.
-    """
+def _plot_ids_with_traits(plot_ids, trait_filters, schema: str):
     where_clause, where_params = _trait_where(trait_filters, plot_ids)
-    sql = f"SELECT DISTINCT plot_id FROM vswir_plants.trait_view{where_clause}"
+    sql = f'SELECT DISTINCT plot_id FROM "{schema}".trait_view{where_clause}'
     with get_connection() as conn:
         df = pd.read_sql(sql, conn, params=list(where_params))
     return df["plot_id"].tolist()
 
 
-def _plot_ids_with_granules(plot_ids, granule_filters):
-    """
-    Narrow plot_ids to only those that have at least one matching granule (via pixel).
-    Opens its own connection.
-    """
-    cte_sql, pixel_fragment, params = _granule_cte_and_where(granule_filters, plot_ids)
+def _plot_ids_with_granules(plot_ids, granule_filters, schema: str):
+    cte_sql, pixel_fragment, params = _granule_cte_and_where(granule_filters, plot_ids, schema)
     sql = f"""
         {cte_sql}
         SELECT DISTINCT px.plot_id
         FROM filtered_granules fg
-        JOIN vswir_plants.pixel px ON px.granule_id = fg.granule_id
+        JOIN "{schema}".pixel px ON px.granule_id = fg.granule_id
         WHERE {pixel_fragment}
     """
     with get_connection() as conn:
@@ -163,31 +141,25 @@ def _plot_ids_with_granules(plot_ids, granule_filters):
 
 
 # ---------------------------------------------------------------------------
-# Stage 2 — parallel COUNT queries (separate connections, no data rows)
+# Stage 2 — parallel COUNT queries
 # ---------------------------------------------------------------------------
 
-def _count_traits(plot_ids, trait_filters):
-    """COUNT(*) on trait_view for all matching plots — opens its own connection."""
+def _count_traits(plot_ids, trait_filters, schema: str):
     where_clause, where_params = _trait_where(trait_filters, plot_ids)
-    sql = f"SELECT COUNT(*) AS n FROM vswir_plants.trait_view{where_clause}"
+    sql = f'SELECT COUNT(*) AS n FROM "{schema}".trait_view{where_clause}'
     logger.debug("Count traits SQL: %s", sql)
     with get_connection() as conn:
         df = pd.read_sql(sql, conn, params=list(where_params))
     return int(df["n"].iloc[0])
 
 
-def _count_granules(plot_ids, granule_filters):
-    """
-    COUNT(DISTINCT granule_id) via the CTE pattern — opens its own connection.
-    Narrows granules first, then counts distinct granule_ids that have pixels
-    for the matched plots.
-    """
-    cte_sql, pixel_fragment, params = _granule_cte_and_where(granule_filters, plot_ids)
+def _count_granules(plot_ids, granule_filters, schema: str):
+    cte_sql, pixel_fragment, params = _granule_cte_and_where(granule_filters, plot_ids, schema)
     sql = f"""
         {cte_sql}
         SELECT COUNT(DISTINCT fg.granule_id) AS n
         FROM filtered_granules fg
-        JOIN vswir_plants.pixel px ON px.granule_id = fg.granule_id
+        JOIN "{schema}".pixel px ON px.granule_id = fg.granule_id
         WHERE {pixel_fragment}
     """
     logger.debug("Count granules SQL: %s", sql)
@@ -197,14 +169,10 @@ def _count_granules(plot_ids, granule_filters):
 
 
 # ---------------------------------------------------------------------------
-# Stage 4 — parallel data queries for the page (separate connections)
+# Stage 4 — parallel data queries for the page
 # ---------------------------------------------------------------------------
 
-def _fetch_plots(plot_ids_page, fmt):
-    """
-    Fetch plot_shape_view rows for the page and serialise to the requested format.
-    Opens its own connection.
-    """
+def _fetch_plots(plot_ids_page, fmt, schema: str):
     if not plot_ids_page:
         return {}
 
@@ -212,7 +180,7 @@ def _fetch_plots(plot_ids_page, fmt):
     params  = []
     _build_array_in_clause("plot_id", plot_ids_page, clauses, params)
     where = " WHERE " + clauses[0]
-    sql = f"SELECT * FROM vswir_plants.plot_shape_view{where}"
+    sql = f'SELECT * FROM "{schema}".plot_shape_view{where}'
 
     with get_connection() as conn:
         try:
@@ -253,15 +221,12 @@ def _fetch_plots(plot_ids_page, fmt):
     return {"plots": records}
 
 
-def _fetch_traits(plot_ids_page, trait_filters):
-    """
-    Fetch trait rows for the page only. Opens its own connection.
-    """
+def _fetch_traits(plot_ids_page, trait_filters, schema: str):
     if not plot_ids_page:
         return []
 
     where_clause, where_params = _trait_where(trait_filters, plot_ids_page)
-    sql = f"SELECT * FROM vswir_plants.trait_view{where_clause}"
+    sql = f'SELECT * FROM "{schema}".trait_view{where_clause}'
     logger.debug("Fetch traits SQL: %s", sql)
 
     with get_connection() as conn:
@@ -269,18 +234,11 @@ def _fetch_traits(plot_ids_page, trait_filters):
     return df.to_dict(orient="records")
 
 
-def _fetch_granules(plot_ids_page, granule_filters):
-    """
-    Fetch granule rows with aggregated pixel_ids for the page only.
-
-    CTE narrows granule_view by granule-column filters first, then joins
-    pixel scoped to plot_ids_page — aggregation only runs on the narrow set.
-    Opens its own connection.
-    """
+def _fetch_granules(plot_ids_page, granule_filters, schema: str):
     if not plot_ids_page:
         return []
 
-    cte_sql, pixel_fragment, params = _granule_cte_and_where(granule_filters, plot_ids_page)
+    cte_sql, pixel_fragment, params = _granule_cte_and_where(granule_filters, plot_ids_page, schema)
 
     sql = f"""
         {cte_sql}
@@ -295,7 +253,7 @@ def _fetch_granules(plot_ids_page, granule_filters):
             array_agg(DISTINCT px.plot_id)              AS plot_ids,
             array_agg(px.pixel_id ORDER BY px.pixel_id) AS pixel_ids
         FROM filtered_granules fg
-        JOIN vswir_plants.pixel px ON px.granule_id = fg.granule_id
+        JOIN "{schema}".pixel px ON px.granule_id = fg.granule_id
         WHERE {pixel_fragment}
         GROUP BY
             fg.granule_id, fg.campaign_name, fg.sensor_name,
@@ -307,7 +265,6 @@ def _fetch_granules(plot_ids_page, granule_filters):
     with get_connection() as conn:
         df = pd.read_sql(sql, conn, params=params)
 
-    # Ensure arrays are Python lists
     for col in ("plot_ids", "pixel_ids"):
         if col in df.columns:
             df[col] = df[col].apply(
@@ -328,24 +285,12 @@ def _fetch_granules(plot_ids_page, granule_filters):
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_linked_query(body: dict) -> dict:
+def run_linked_query(body: dict, schema: str = "vswir_plants") -> dict:
     """
     Execute the 4-stage linked query and return the assembled response body.
-
-    Stage 1 : Spatial filter → all matching plot_ids (single connection, cheap)
-    Stage 2 : Parallel COUNT queries (two connections) → total_traits, total_granules
-    Stage 3 : Paginate plot_ids
-    Stage 4 : Parallel data queries for page only (three connections) →
-              plots, traits, granules
-
-    Parameters (all optional):
-        campaign_name   : str
-        geojson         : GeoJSON geometry dict
-        trait_filters   : dict  — trait/sample/date filters
-        granule_filters : dict  — sensor/date filters
-        format          : str   — 'geoparquet' | 'geojson' | 'json'
-        limit           : int   — plots per page (default 100)
-        offset          : int   — plot page offset (default 0)
+    'schema' is the PostgreSQL schema name — either 'vswir_plants' (production)
+    or 'vswir_plants_staging' (staging). Both are queried via the same
+    postgrest_user DB connection.
     """
     campaign_name   = body.get("campaign_name")
     geojson         = body.get("geojson")
@@ -355,27 +300,22 @@ def run_linked_query(body: dict) -> dict:
     limit           = int(body.get("limit", 100))
     offset          = int(body.get("offset", 0))
 
-    # ------------------------------------------------------------------
-    # Stage 1 — spatial filter (single connection)
-    # ------------------------------------------------------------------
+    # Stage 1 — spatial filter
     with get_connection() as conn:
-        all_plot_ids = _stage1_plot_ids(geojson, campaign_name, conn)
+        all_plot_ids = _stage1_plot_ids(geojson, campaign_name, conn, schema)
 
-    # Stage 1b — if trait or granule filters are provided, narrow plot_ids
-    # to only those that actually have matching traits / granules.
-    # Run in parallel when both filters are active.
     if trait_filters and granule_filters:
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-            tf = pool.submit(_plot_ids_with_traits,   all_plot_ids, trait_filters)
-            gf = pool.submit(_plot_ids_with_granules, all_plot_ids, granule_filters)
+            tf = pool.submit(_plot_ids_with_traits,   all_plot_ids, trait_filters,   schema)
+            gf = pool.submit(_plot_ids_with_granules, all_plot_ids, granule_filters, schema)
             trait_plot_ids   = set(tf.result())
             granule_plot_ids = set(gf.result())
         all_plot_ids = [p for p in all_plot_ids if p in trait_plot_ids and p in granule_plot_ids]
     elif trait_filters:
-        trait_plot_ids = set(_plot_ids_with_traits(all_plot_ids, trait_filters))
+        trait_plot_ids = set(_plot_ids_with_traits(all_plot_ids, trait_filters, schema))
         all_plot_ids = [p for p in all_plot_ids if p in trait_plot_ids]
     elif granule_filters:
-        granule_plot_ids = set(_plot_ids_with_granules(all_plot_ids, granule_filters))
+        granule_plot_ids = set(_plot_ids_with_granules(all_plot_ids, granule_filters, schema))
         all_plot_ids = [p for p in all_plot_ids if p in granule_plot_ids]
 
     total_plots = len(all_plot_ids)
@@ -391,36 +331,29 @@ def run_linked_query(body: dict) -> dict:
             "granules":       [],
         }
 
-    # ------------------------------------------------------------------
-    # Stage 2 — parallel COUNT queries (two separate connections)
-    # Counts are over the full matched plot set so pagination totals are accurate.
-    # ------------------------------------------------------------------
+    # Stage 2 — parallel COUNT queries
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-        trait_count_future   = pool.submit(_count_traits,   all_plot_ids, trait_filters)
-        granule_count_future = pool.submit(_count_granules, all_plot_ids, granule_filters)
+        trait_count_future   = pool.submit(_count_traits,   all_plot_ids, trait_filters,   schema)
+        granule_count_future = pool.submit(_count_granules, all_plot_ids, granule_filters, schema)
         total_traits   = trait_count_future.result()
         total_granules = granule_count_future.result()
 
-    # ------------------------------------------------------------------
-    # Stage 3 — paginate plot list
-    # ------------------------------------------------------------------
+    # Stage 3 — paginate
     truncated     = total_plots > (offset + limit)
     plot_ids_page = all_plot_ids[offset: offset + limit]
 
-    # ------------------------------------------------------------------
-    # Stage 4 — parallel data queries for the page only (three connections)
-    # ------------------------------------------------------------------
+    # Stage 4 — parallel data queries for the page
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-        plots_future   = pool.submit(_fetch_plots,   plot_ids_page, fmt)
-        traits_future  = pool.submit(_fetch_traits,  plot_ids_page, trait_filters)
-        granules_future = pool.submit(_fetch_granules, plot_ids_page, granule_filters)
+        plots_future    = pool.submit(_fetch_plots,    plot_ids_page, fmt,             schema)
+        traits_future   = pool.submit(_fetch_traits,   plot_ids_page, trait_filters,   schema)
+        granules_future = pool.submit(_fetch_granules, plot_ids_page, granule_filters, schema)
         plots_payload = plots_future.result()
         page_traits   = traits_future.result()
         page_granules = granules_future.result()
 
     logger.debug(
-        "Linked query: %d plots total (%d traits, %d granules), page %d-%d",
-        total_plots, total_traits, total_granules, offset, offset + limit,
+        "Linked query (%s): %d plots total (%d traits, %d granules), page %d-%d",
+        schema, total_plots, total_traits, total_granules, offset, offset + limit,
     )
 
     response = {

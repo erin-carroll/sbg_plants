@@ -28,7 +28,9 @@ export function useJobPolling(jobsBySensor, isPolling, onAllComplete) {
       const poll = async () => {
         try {
           const result = await pollJobStatus(jobId);
-          const status = result.status === 'queued' ? 'queued' : (result.presigned_url ? 'complete' : 'running');
+          const isFailed   = result.status === 'failed';
+          const isComplete = !!result.presigned_url;
+          const status = isFailed ? 'failed' : isComplete ? 'complete' : result.status === 'queued' ? 'queued' : 'running';
 
           setSensorStatuses(prev => ({
             ...prev,
@@ -36,11 +38,11 @@ export function useJobPolling(jobsBySensor, isPolling, onAllComplete) {
               status,
               rowsProcessed: result.rows_processed || 0,
               downloadUrl: result.presigned_url || null,
-              error: null
+              error: isFailed ? 'Job failed — the query returned no results or an error occurred.' : null,
             }
           }));
 
-          if (result.presigned_url) {
+          if (isComplete || isFailed) {
             clearInterval(intervalsRef.current[sensorKey]);
             delete intervalsRef.current[sensorKey];
             completedJobs += 1;

@@ -14,7 +14,7 @@ function Navbar({ showControls = true }) {
   const location  = useLocation();
 
   // Map pathname to tab value — unknown paths fall back to false (no tab highlighted)
-  const TAB_PATHS = ['/', '/isofit', '/ingest', '/admin'];
+  const TAB_PATHS = ['/', '/data-products', '/ingest', '/admin'];
   const currentTab = TAB_PATHS.includes(location.pathname) ? location.pathname : false;
 
   return (
@@ -43,8 +43,8 @@ function Navbar({ showControls = true }) {
             />
             {isSuperAdmin && (
               <Tab
-                label="ISOFIT"
-                value="/isofit"
+                label="Data Products"
+                value="/data-products"
                 sx={{ textTransform: 'none', fontWeight: 500, color: 'rgba(255,255,255,0.8)',
                       '&.Mui-selected': { color: 'white' } }}
               />

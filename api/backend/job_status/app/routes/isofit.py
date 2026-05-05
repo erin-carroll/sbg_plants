@@ -17,9 +17,22 @@ def list_jobs(event: dict) -> dict:
 
     qs = event.get("queryStringParameters") or {}
     limit = min(int(qs.get("limit", 5)), 50)
+    job_type = qs.get("job_type", "isofit_parent")
 
-    jobs = dynamo.list_parent_jobs(limit)
+    jobs = dynamo.list_parent_jobs(limit, job_type=job_type)
     return respond(200, {"jobs": jobs})
+
+
+def job_pixels(event: dict, parent_job_id: str) -> dict:
+    """GET /job_status/{id}?mode=pixels — return pixel IDs grouped by campaign|sensor."""
+    try:
+        claims = get_claims(event)
+        require_admin(claims)
+    except Exception as err:
+        return handle_error(err)
+
+    pixels_by_sensor = dynamo.get_parent_pixel_ids_by_sensor(parent_job_id)
+    return respond(200, {"pixels_by_sensor": pixels_by_sensor})
 
 
 def job_summary(event: dict, parent_job_id: str) -> dict:
@@ -92,8 +105,15 @@ def job_summary(event: dict, parent_job_id: str) -> dict:
             total_pixels_processed += delta
 
     # ── Derive and write back parent status ───────────────────────────────────
-    parent_status = _derive_parent_status(statuses)
-    dynamo.update_job_status(parent_job_id, parent_status)
+    # Don't overwrite a "promoted" or "deleted" status — both were set intentionally
+    # by the promotion Lambda and must not be clobbered by child job aggregation.
+    parent_record = dynamo.get_job(parent_job_id)
+    current_status = (parent_record or {}).get("status", {}).get("S", "") if parent_record else ""
+    if current_status in ("promoted", "deleted"):
+        parent_status = current_status
+    else:
+        parent_status = _derive_parent_status(statuses)
+        dynamo.update_job_status(parent_job_id, parent_status)
 
     return respond(200, {
         "parent_job_id":          parent_job_id,

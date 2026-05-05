@@ -126,15 +126,150 @@ resource "aws_lambda_permission" "apigw" {
   source_arn    = "${var.api_execution_arn}/*"
 }
 
-resource "aws_apigatewayv2_route" "pixel_selection" {
+resource "aws_apigatewayv2_route" "run_algorithm" {
   api_id             = var.api_id
-  route_key          = "POST /run_isofit"
+  route_key          = "POST /run_algorithm"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
   authorizer_id      = var.cognito_authorizer_id
   authorization_type = "JWT"
 }
 
-# Batch Execution Role (same as ECS task execution role)
+# ── Pixel Output Promotion Lambda ────────────────────────────────────────────
+# Promotes algorithm results from vswir_plants_staging output tables to
+# vswir_plants production tables. Algorithm-agnostic — new data products
+# are registered in the lambda's PRODUCT_REGISTRY, not in Terraform.
+
+resource "aws_iam_role" "pixel_output_promotion_role" {
+  name = "vswir-plants-pixel-output-promotion-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_policy" "pixel_output_promotion_policy" {
+  name        = "vswir-plants-pixel-output-promotion-policy"
+  description = "Allow pixel output promotion Lambda to read DB credentials and update DynamoDB job records"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = aws_secretsmanager_secret.isofit_user.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query",
+        ]
+        Resource = [
+          var.dynamodb_table_arn,
+          "${var.dynamodb_table_arn}/index/parent_job_id-index",
+        ]
+      },
+    ]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "pixel_output_promotion_attach" {
+  role       = aws_iam_role.pixel_output_promotion_role.name
+  policy_arn = aws_iam_policy.pixel_output_promotion_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "pixel_output_promotion_basic_execution" {
+  role       = aws_iam_role.pixel_output_promotion_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy_attachment" "pixel_output_promotion_vpc_execution" {
+  role       = aws_iam_role.pixel_output_promotion_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_lambda_function" "pixel_output_promotion" {
+  function_name = "vswir-plants-pixel-output-promotion"
+  role          = aws_iam_role.pixel_output_promotion_role.arn
+  package_type  = "Image"
+  image_uri     = var.pixel_output_promotion_ecr_image
+  timeout       = 60
+
+  vpc_config {
+    subnet_ids         = var.private_subnets
+    security_group_ids = [aws_security_group.worker.id]
+  }
+
+  environment {
+    variables = {
+      ISOFIT_DB_SECRET_ARN = aws_secretsmanager_secret.isofit_user.arn
+      DYNAMODB_TABLE       = var.dynamodb_table_name
+    }
+  }
+
+  tags = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "pixel_output_promotion" {
+  name              = "/aws/lambda/vswir-plants-pixel-output-promotion"
+  retention_in_days = 30
+  tags              = var.tags
+}
+
+resource "aws_apigatewayv2_integration" "pixel_output_promotion" {
+  api_id                 = var.api_id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.pixel_output_promotion.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_lambda_permission" "pixel_output_promotion_apigw" {
+  statement_id  = "AllowAPIGatewayInvokePromotion"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.pixel_output_promotion.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${var.api_execution_arn}/*"
+}
+
+# POST /data_products/{product_key}/jobs/{job_id}/promote
+resource "aws_apigatewayv2_route" "pixel_output_promote" {
+  api_id             = var.api_id
+  route_key          = "POST /data_products/{product_key}/jobs/{job_id}/promote"
+  target             = "integrations/${aws_apigatewayv2_integration.pixel_output_promotion.id}"
+  authorizer_id      = var.cognito_authorizer_id
+  authorization_type = "JWT"
+}
+
+# DELETE /data_products/{product_key}/jobs/{job_id} — delete staging rows without promoting
+resource "aws_apigatewayv2_route" "pixel_output_delete" {
+  api_id             = var.api_id
+  route_key          = "DELETE /data_products/{product_key}/jobs/{job_id}"
+  target             = "integrations/${aws_apigatewayv2_integration.pixel_output_promotion.id}"
+  authorizer_id      = var.cognito_authorizer_id
+  authorization_type = "JWT"
+}
+
+# GET /data_products — returns registered algorithm registry to the frontend
+resource "aws_apigatewayv2_route" "pixel_output_list_products" {
+  api_id             = var.api_id
+  route_key          = "GET /data_products"
+  target             = "integrations/${aws_apigatewayv2_integration.pixel_output_promotion.id}"
+  authorizer_id      = var.cognito_authorizer_id
+  authorization_type = "JWT"
+}
+
+# ── Batch Execution Role (same as ECS task execution role) ────────────────────
 resource "aws_iam_role" "batch_execution_role" {
   name = "batchExecutionRolePixel"
 

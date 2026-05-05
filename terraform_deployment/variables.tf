@@ -124,3 +124,13 @@ variable "ingestion_promotion_password" {
 variable "rejection_image_uri" {
   description = "ECR image URI for the rejection Lambda"
 }
+
+variable "job_status_ecr_image" {
+  description = "ECR image URI for the job status Lambda"
+  type        = string
+}
+
+variable "pixel_output_promotion_ecr_image" {
+  description = "ECR image URI for the pixel output promotion Lambda"
+  type        = string
+}

@@ -30,6 +30,8 @@ from __future__ import annotations
 
 import pandas as pd
 from shapely.geometry import Point
+from pyproj import Transformer, CRS
+from shapely.ops import transform
 
 from app.checks.types import CheckContext, CheckResult
 from app.checks.universal import (
@@ -236,7 +238,6 @@ def _check_band_count(
         }]
     return []
 
-
 def _check_coordinates(
     row: pd.Series,
     plot_geom,
@@ -252,35 +253,90 @@ def _check_coordinates(
     on the polygon boundary — used to bucket violations by severity.
 
     When GSD is known, constructs a GSD × GSD square centred on the pixel
-    centroid (cap_style=3) and checks whether it intersects the plot polygon.
-    This matches rioxarray's all_touched=True semantics — any pixel whose
-    footprint overlaps the plot boundary is accepted.
+    centroid and checks whether it intersects the plot polygon (matching
+    rioxarray's all_touched=True semantics).
 
     When GSD is unknown, falls back to a plain centroid intersects check.
+
+    Buffers and distances are computed in a local azimuthal equidistant
+    projection centred on the point, avoiding the latitude-dependent
+    degree-to-metre error of a flat 1/111320 factor.
     """
     try:
         lon = float(row["lon"])
         lat = float(row["lat"])
     except (ValueError, TypeError):
-        return [], []  # non-castable values already caught by the type check
+        return [], []
 
     if not (-180 <= lon <= 180 and -90 <= lat <= 90):
-        return [idx + 2], []  # skip footprint check if coordinates are garbage
+        return [idx + 2], []
 
     pt = Point(lon, lat)
 
+    # Build a local azimuthal equidistant CRS centred on this point.
+    # All distances/areas are accurate at the centre, which is all we need.
+    aeqd = CRS.from_proj4(
+        f"+proj=aeqd +lat_0={lat} +lon_0={lon} +datum=WGS84 +units=m"
+    )
+    to_aeqd   = Transformer.from_crs("EPSG:4326", aeqd, always_xy=True).transform
+    to_wgs84  = Transformer.from_crs(aeqd, "EPSG:4326", always_xy=True).transform
+
     if gsd is not None:
-        radius_deg      = (float(gsd) / 2) / 111320
-        pixel_footprint = pt.buffer(radius_deg, cap_style=3)
+        # Buffer in projected space (metres), then reproject to 4326 for
+        # the intersection test against plot_geom (which lives in 4326).
+        pt_proj         = transform(to_aeqd, pt)          # → (0, 0) in AEQD
+        half            = float(gsd) / 2
+        footprint_proj  = pt_proj.buffer(half, cap_style=3)   # square, metres
+        pixel_footprint = transform(to_wgs84, footprint_proj)  # back to 4326
         intersects      = plot_geom.intersects(pixel_footprint)
     else:
         intersects = plot_geom.intersects(pt)
 
     if not intersects:
-        dist_m = plot_geom.exterior.distance(pt) * 111320
+        # Distance from the plot exterior to the centroid, in metres.
+        # Computed in projected space to avoid the flat-earth approximation.
+        plot_geom_proj = transform(to_aeqd, plot_geom)
+        dist_m = plot_geom_proj.exterior.distance(transform(to_aeqd, pt))
         return [], [(idx + 2, dist_m)]
 
     return [], []
+
+# if gsd is in degrees
+# def _check_coordinates(
+#     row: pd.Series,
+#     plot_geom,
+#     gsd: float | None,
+#     idx: int,
+# ) -> tuple[list[int], list[tuple[int, float]]]:
+#     """
+#     Check lon/lat for WGS84 bounds and pixel footprint intersection.
+#     Returns (out_of_bounds_rows, outside_polygon_entries).
+
+#     GSD is expected in degrees.
+#     """
+#     try:
+#         lon = float(row["lon"])
+#         lat = float(row["lat"])
+#     except (ValueError, TypeError):
+#         return [], []
+
+#     if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+#         return [idx + 2], []
+
+#     pt = Point(lon, lat)
+
+#     if gsd is not None:
+#         half = float(gsd) / 2
+#         pixel_footprint = pt.buffer(half, cap_style=3)
+#         intersects = plot_geom.intersects(pixel_footprint)
+#     else:
+#         intersects = plot_geom.intersects(pt)
+
+#     if not intersects:
+#         dist_deg = plot_geom.exterior.distance(pt)
+#         return [], [(idx + 2, dist_deg)]
+
+#     return [], []
 
 
 def _summarise_outside_polygon(

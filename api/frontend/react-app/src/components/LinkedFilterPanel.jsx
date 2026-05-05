@@ -187,6 +187,14 @@ function LinkedFilterPanel({
       {/* Granule filters — collapsible */}
       <CollapsibleSection title="Granule filters">
         <Stack spacing={2}>
+          <TextField
+            label="Granule ID"
+            size="small"
+            fullWidth
+            value={granuleFilters.granule_id ?? ''}
+            onChange={e => setGF('granule_id')(e.target.value)}
+            placeholder="e.g. ang20180814t193848"
+          />
           <EnumField label="Sensor name"       value={granuleFilters.sensor_name ?? []}       onChange={setGF('sensor_name')}       options={ENUMS.sensor_name} />
           <EnumField label="Cloudy conditions" value={granuleFilters.cloudy_conditions ?? []} onChange={setGF('cloudy_conditions')} options={ENUMS.cloudy_conditions} />
           <EnumField label="Cloud type"        value={granuleFilters.cloud_type ?? []}        onChange={setGF('cloud_type')}        options={ENUMS.cloud_type} />

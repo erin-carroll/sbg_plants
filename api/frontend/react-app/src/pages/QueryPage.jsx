@@ -5,14 +5,17 @@ import QueryFilterSection from '../components/QueryFilterSection';
 import JobStatus from '../components/JobStatus';
 import MapView from '../components/MapView';
 import DataTable from '../components/DataTable';
+import StagingToggle from '../components/StagingToggle';
 import { summarizeValue, convertToCSV, parseFilters } from '../utils/helpers';
 import { SELECT_CONFIGS } from '../viewConfig';
 import { fetchParquet } from '../utils/api';
 import { useQueryPage } from '../hooks/useQueryPage';
 import { useSpectraExtraction } from '../hooks/useSpectraExtraction';
+import { useSchema } from '../context/SchemaContext';
 
 function QueryPage() {
   const { view, query, viewOptions, currentViewConfig, handleViewChange, handleReset, hideExtract } = useQueryPage();
+  const { schema } = useSchema();
 
   const spectra = useSpectraExtraction(
     query.getPixelRanges,
@@ -25,7 +28,7 @@ function QueryPage() {
       const filename = window.prompt('Enter file name:', 'table_data');
       if (!filename) return;
       const filters   = parseFilters(query.filterValues, query.geojsonContent);
-      const result    = await fetchParquet(view, filters);
+      const result    = await fetchParquet(view, filters, null, 0, schema);
       const columns   = SELECT_CONFIGS[view];
       const geomIndex = columns.findIndex(c => c === 'geom' || c === 'geometry');
 
@@ -69,6 +72,8 @@ function QueryPage() {
     <Box sx={{ flexGrow: 1 }}>
       <Navbar />
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+        <StagingToggle />
+
         <QueryFilterSection
           query={query}
           currentViewConfig={currentViewConfig}

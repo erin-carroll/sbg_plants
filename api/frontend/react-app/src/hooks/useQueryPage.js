@@ -4,8 +4,8 @@ import { VIEW_CONFIG, VIEW_CONFIGS } from '../viewConfig';
 
 /**
  * Shared state for any page that has a view selector, filters, map and table.
- * QueryPage and IsoFitPage both use this — they only differ in the secondary
- * hook (useSpectraExtraction vs useIsoFitJob) and their layout.
+ * QueryPage and DataProductsPage both use this — they only differ in the secondary
+ * hook (useSpectraExtraction vs useAlgorithmJob) and their layout.
  */
 export function useQueryPage() {
   const [view, setView] = useState('plot_shape_view');

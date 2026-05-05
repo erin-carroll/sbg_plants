@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, CircularProgress } from '@mui/material';
 import QueryPage from './pages/QueryPage';
 import LinkedQueryPage from './pages/LinkedQueryPage';
-import IsoFitPage from './pages/IsoFitPage';
+import DataProductsPage from './pages/DataProductsPage';
 import IngestPage from './pages/IngestPage';
 import AdminPage from './pages/AdminPage';
 import LoginButton from './components/LoginButton';
@@ -63,14 +63,17 @@ function App() {
         }
       />
 
+      {/* /data-products — algorithm selection, job submission, monitoring, promotion */}
+      {/* /isofit kept as an alias for backward compatibility with any existing bookmarks */}
       <Route
-        path="/isofit"
+        path="/data-products"
         element={
           <RequireRole check={isSuperAdmin}>
-            <IsoFitPage />
+            <DataProductsPage />
           </RequireRole>
         }
       />
+      <Route path="/isofit" element={<Navigate to="/data-products" replace />} />
 
       <Route
         path="/ingest"
@@ -88,3 +91,4 @@ function App() {
 }
 
 export default App;
+
