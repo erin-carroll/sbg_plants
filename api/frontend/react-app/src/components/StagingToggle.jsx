@@ -9,7 +9,7 @@ import { useIsAdmin } from '../hooks/useIsAdmin';
  *
  * Only rendered for admin and superadmin users; invisible to regular users.
  */
-export default function StagingToggle() {
+export default function StagingToggle({ onToggle } = {}) {
   const { isAdmin } = useIsAdmin();
   const { isStaging, setSchema } = useSchema();
 
@@ -21,7 +21,10 @@ export default function StagingToggle() {
         control={
           <Switch
             checked={isStaging}
-            onChange={(e) => setSchema(e.target.checked ? 'staging' : 'production')}
+            onChange={(e) => {
+              setSchema(e.target.checked ? 'staging' : 'production');
+              onToggle?.();
+            }}
             color="info"
             size="small"
           />

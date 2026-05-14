@@ -49,7 +49,7 @@ function GranuleCard({ g, open, onToggle, plotId }) {
   return (
     <Box sx={{ borderRadius: 1, border: '1px solid', borderColor: 'grey.200' }}>
       <Box
-        sx={{ px: 1.5, py: 1, cursor: 'pointer', bgcolor: 'grey.50', borderRadius: open ? '4px 4px 0 0' : 1 }}
+        sx={{ px: 1.5, py: 1, cursor: 'pointer', bgcolor: 'grey.50', borderRadius: open ? '4px 4px 0 0' : 1, '&:hover': { bgcolor: '#F6E9C9' } }}
         onClick={() => onToggle()}
       >
         {/* Row 1: granule ID + chevron */}
@@ -150,7 +150,7 @@ function PlotSidePanel({ plotId, traits, granules, onClose }) {
                   </TableHead>
                   <TableBody>
                     {traits.map((t, i) => (
-                      <TableRow key={i} hover>
+                      <TableRow key={i} sx={{ '&:hover': { bgcolor: '#F6E9C9' } }}>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.trait)              ? t.trait              : '—'}</TableCell>
                         <TableCell>                                {t.value != null              ? t.value              : '—'}</TableCell>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>{present(t.units)              ? t.units              : '—'}</TableCell>

@@ -21,7 +21,7 @@ function DataTable({ columns, data, summarizeValue, defaultCollapsed = false }) 
 
   return (
     <Paper elevation={2}>
-      <Box sx={{ bgcolor: '#f5f5f5', p: 2, borderBottom: collapsed ? 'none' : '1px solid #ddd' }}>
+      <Box sx={{ bgcolor: 'grey.100', p: 2, borderBottom: collapsed ? 'none' : '1px solid', borderColor: 'divider' }}>
         <Stack direction="row" spacing={1} alignItems="center">
           <TableIcon color="primary" />
           <Typography variant="h6">Data Table</Typography>
@@ -40,7 +40,7 @@ function DataTable({ columns, data, summarizeValue, defaultCollapsed = false }) 
             <TableHead>
               <TableRow>
                 {columns.map(col => (
-                  <TableCell key={col.key} sx={{ fontWeight: 'bold', bgcolor: '#fafafa' }}>
+                  <TableCell key={col.key} sx={{ fontWeight: 'bold', bgcolor: 'grey.50' }}>
                     {col.label}
                   </TableCell>
                 ))}

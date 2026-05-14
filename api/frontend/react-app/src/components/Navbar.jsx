@@ -23,7 +23,13 @@ function Navbar({ showControls = true }) {
         <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', minHeight: 56 }}>
 
           {/* Left — title */}
-          <Typography variant="h6" sx={{ fontWeight: 600, mr: 3, whiteSpace: 'nowrap' }}>
+          <Typography variant="h6" sx={{
+            fontWeight: 700, mr: 3, whiteSpace: 'nowrap', fontSize: '1.5rem',
+            background: 'linear-gradient(90deg, #37598C, #0091DB, #3E8450, #E8CC56, #DB9D3A, #C16B49)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>
             VSWIR Plants
           </Typography>
 
@@ -32,21 +38,23 @@ function Navbar({ showControls = true }) {
             value={currentTab}
             onChange={(_, val) => navigate(val)}
             textColor="inherit"
-            TabIndicatorProps={{ style: { backgroundColor: 'white', height: 3 } }}
+            TabIndicatorProps={{ style: { backgroundColor: '#0091DB', height: 3 } }}
             sx={{ flex: 1 }}
           >
             <Tab
               label="Query"
               value="/"
               sx={{ textTransform: 'none', fontWeight: 500, color: 'rgba(255,255,255,0.8)',
-                    '&.Mui-selected': { color: 'white' } }}
+                    '&.Mui-selected': { color: '#0091DB' },
+                    '&:hover': { color: '#0091DB' } }}
             />
             {isSuperAdmin && (
               <Tab
                 label="Data Products"
                 value="/data-products"
                 sx={{ textTransform: 'none', fontWeight: 500, color: 'rgba(255,255,255,0.8)',
-                      '&.Mui-selected': { color: 'white' } }}
+                      '&.Mui-selected': { color: '#0091DB' },
+                      '&:hover': { color: '#0091DB' } }}
               />
             )}
             {isAdmin && (
@@ -54,7 +62,8 @@ function Navbar({ showControls = true }) {
                 label="Ingest"
                 value="/ingest"
                 sx={{ textTransform: 'none', fontWeight: 500, color: 'rgba(255,255,255,0.8)',
-                      '&.Mui-selected': { color: 'white' } }}
+                      '&.Mui-selected': { color: '#0091DB' },
+                      '&:hover': { color: '#0091DB' } }}
               />
             )}
             {isAdmin && (
@@ -62,7 +71,8 @@ function Navbar({ showControls = true }) {
                 label="Admin"
                 value="/admin"
                 sx={{ textTransform: 'none', fontWeight: 500, color: 'rgba(255,255,255,0.8)',
-                      '&.Mui-selected': { color: 'white' } }}
+                      '&.Mui-selected': { color: '#0091DB' },
+                      '&:hover': { color: '#0091DB' } }}
               />
             )}
           </Tabs>
@@ -74,7 +84,7 @@ function Navbar({ showControls = true }) {
               color="inherit"
               onClick={redirectToLogout}
               startIcon={<LogoutIcon />}
-              sx={{ textTransform: 'none', fontWeight: 500 }}
+              sx={{ textTransform: 'none', fontWeight: 500, '&:hover': { color: '#0091DB' } }}
             >
               Logout
             </Button>

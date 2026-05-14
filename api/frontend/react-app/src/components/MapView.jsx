@@ -6,6 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw';
 import 'leaflet-draw/dist/leaflet.draw.css';
+import { palette } from '../theme';
 
 // Fix leaflet-draw ES module bug: readableArea references bare `type` global.
 if (typeof window !== 'undefined' && !window.type) {
@@ -55,7 +56,7 @@ function FeatureClickHandler({ mapData, onFeatureClick, resultKey }) {
 
     // Polygon layer — only visible at zoom >= 13
     const polyLayer = L.geoJSON(mapData, {
-      style: { weight: 1, color: '#1976d2', fillColor: '#1976d2', fillOpacity: 0.25 },
+      style: { weight: 1, color: palette.primary.main, fillColor: palette.primary.main, fillOpacity: 0.2 },
       onEachFeature: (feature, layer) => {
         const plotId = feature.properties?.plot_id ?? feature.properties?.id;
         layer.on('click',     () => { if (plotId != null) onFeatureClick(plotId); });
@@ -75,12 +76,12 @@ function FeatureClickHandler({ mapData, onFeatureClick, resultKey }) {
         const marker = L.circleMarker(centroid, {
           radius:      getRadius(map.getZoom()),
           weight:      1.5,
-          color:       '#1565c0',
-          fillColor:   '#1976d2',
-          fillOpacity: 0.75,
+          color:       palette.secondary.main,
+          fillColor:   palette.secondary.main,
+          fillOpacity: 0.5,
         });
         marker.on('click',     () => { if (plotId != null) onFeatureClick(plotId); });
-        marker.on('mouseover', () => marker.setStyle({ fillOpacity: 1, radius: getRadius(map.getZoom()) + 3 }));
+        marker.on('mouseover', () => marker.setStyle({ fillOpacity: 0.3, radius: getRadius(map.getZoom()) + 3 }));
         marker.on('mouseout',  () => marker.setStyle({ fillOpacity: 0.75, radius: getRadius(map.getZoom()) }));
         markerGroup.addLayer(marker);
       } catch { /* skip */ }
@@ -143,8 +144,8 @@ function DrawControl({ onShapeDrawn, clearRef, showRef }) {
 
     const drawControl = new L.Control.Draw({
       draw: {
-        polygon:      { allowIntersection: false },
-        rectangle:    {},
+        polygon:      { allowIntersection: false, shapeOptions: { color: palette.success.main, fillColor: palette.success.main, fillOpacity: 0.5 } },
+        rectangle:    { shapeOptions: { color: palette.success.main, fillColor: palette.success.main, fillOpacity: 0.5 } },
         circle:       false,
         marker:       false,
         polyline:     false,
@@ -194,13 +195,13 @@ function DrawControl({ onShapeDrawn, clearRef, showRef }) {
 // Style for query results — default Leaflet blue
 const RESULT_STYLE = {};
 
-// Style for uploaded GeoJSON filter boundary — red
+// Style for uploaded GeoJSON filter boundary
 const FILTER_STYLE = {
-  color:       '#d32f2f',
+  color:       '#0D3E70',
   weight:      2,
   opacity:     1,
-  fillColor:   '#d32f2f',
-  fillOpacity: 0.2,
+  fillColor:   '#436B9B',
+  fillOpacity: 0.4,
 };
 
 /**
@@ -242,7 +243,7 @@ function MapView({
 
   return (
     <Paper elevation={2} sx={{ mb: 3, overflow: 'hidden' }}>
-      <Box sx={{ bgcolor: '#f5f5f5', p: 2, borderBottom: collapsed ? 'none' : '1px solid #ddd' }}>
+      <Box sx={{ bgcolor: 'grey.100', p: 2, borderBottom: collapsed ? 'none' : '1px solid', borderColor: 'divider' }}>
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <MapIcon color="primary" />
           <Typography variant="h6">Map View</Typography>
@@ -254,7 +255,7 @@ function MapView({
           <Box sx={{ flex: 1 }} />
           {!collapsed && (
             <Tooltip title="Recenter map">
-              <IconButton size="small" onClick={() => setRecenterTrigger(v => v + 1)}>
+              <IconButton size="small" onClick={() => setRecenterTrigger(v => v + 1)} sx={{ '&:hover': { bgcolor: '#CE9E4A', color: '#ffffff' } }}>
                 <RecenterIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -265,11 +266,13 @@ function MapView({
               size="small"
               onClick={handleToggleDrawn}
               sx={{
-                bgcolor:    showDrawn ? '#388e3c' : 'transparent',
-                color:      showDrawn ? 'white' : '#388e3c',
-                border:     '1px solid #388e3c',
+                bgcolor:    showDrawn ? 'success.main' : 'transparent',
+                color:      showDrawn ? 'success.contrastText' : 'success.main',
+                border:     '1px solid',
+                borderColor: 'success.main',
                 cursor:     'pointer',
                 fontWeight: 500,
+                '&:hover': { bgcolor: '#36633A', borderColor: '#36633A', color: '#ffffff' },
               }}
             />
           )}
@@ -279,11 +282,13 @@ function MapView({
               size="small"
               onClick={() => setShowFilter(v => !v)}
               sx={{
-                bgcolor:    showFilter ? '#d32f2f' : 'transparent',
-                color:      showFilter ? 'white' : '#d32f2f',
-                border:     '1px solid #d32f2f',
+                bgcolor:    showFilter ? '#0D3E70' : 'transparent',
+                color:      showFilter ? '#ffffff' : '#0D3E70',
+                border:     '1px solid',
+                borderColor: '#0D3E70',
                 cursor:     'pointer',
                 fontWeight: 500,
+                '&:hover': { bgcolor: '#1A2A42', borderColor: '#1A2A42', color: '#ffffff' },
               }}
             />
           )}
@@ -293,11 +298,13 @@ function MapView({
               size="small"
               onClick={() => setShowResults(v => !v)}
               sx={{
-                bgcolor:    showResults ? '#1976d2' : 'transparent',
-                color:      showResults ? 'white' : '#1976d2',
-                border:     '1px solid #1976d2',
+                bgcolor:    showResults ? 'secondary.main' : 'transparent',
+                color:      showResults ? 'secondary.contrastText' : 'secondary.main',
+                border:     '1px solid',
+                borderColor: 'secondary.main',
                 cursor:     'pointer',
                 fontWeight: 500,
+                '&:hover': { bgcolor: '#087099', borderColor: '#087099', color: '#ffffff' },
               }}
             />
           )}

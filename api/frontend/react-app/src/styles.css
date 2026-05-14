@@ -1,6 +1,57 @@
 /* Additional styles for VSWIR Plants app */
 
-/* Leaflet map container */
+/* ============================================================
+   COLOR TOKENS — mirrors src/theme.js palette
+   Edit here to keep non-MUI elements in sync with the theme.
+   ============================================================ */
+:root {
+  /* Primary — EMIT Earth */
+  --color-primary:           #0D3E70;
+  --color-primary-dark:      #1A2A42;   /* hover */
+  --color-primary-light:     #436B9B;
+
+  /* Secondary — EMIT Atmosphere */
+  --color-secondary:         #0091DB;
+  --color-secondary-dark:    #9FDCF4;
+
+  /* Status */
+  --color-success:           #3E8450;   /* EMIT Mineral green */
+  --color-success-bg:        #D8EAD3;
+  --color-error:             #f44336;   /* standard red — no EMIT equivalent */
+  --color-error-bg:          #ffebee;
+  --color-info:              #1E5F68;   /* EMIT deep teal */
+  --color-info-bg:           #E4F4F9;
+
+  /* Neutrals — EMIT Spectrum */
+  --color-border:            #9DAAB2;
+  --color-surface:           #D6DFE5;
+  --color-overlay:           rgba(255, 255, 255, 0.8);
+}
+
+/* Leaflet zoom controls */
+.leaflet-control-zoom a {
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #CE9E4A !important;
+  color: #ffffff !important;
+  border-color: #CE9E4A !important;
+}
+
+/* Leaflet Draw toolbar buttons */
+.leaflet-draw-toolbar a,
+.leaflet-draw-edit-toolbar a {
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.leaflet-draw-toolbar a:hover,
+.leaflet-draw-edit-toolbar a:hover {
+  background-color: #CE9E4A !important;
+  border-color: #CE9E4A !important;
+}
+
+
 .leaflet-container {
   font-family: 'Roboto', sans-serif;
   border-radius: 4px;
@@ -28,6 +79,10 @@
   line-height: 1.4;
 }
 
+/* ============================================================
+   MUI OVERRIDES
+   ============================================================ */
+
 /* Table cell ellipsis for long content */
 .MuiTableCell-root {
   max-width: 200px;
@@ -42,18 +97,24 @@
   overflow-y: auto;
 }
 
-/* File upload styling */
+/* ============================================================
+   FORM ELEMENTS
+   ============================================================ */
 input[type="file"] {
   padding: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   cursor: pointer;
   font-family: 'Roboto', sans-serif;
 }
 
 input[type="file"]:hover {
-  border-color: #1976d2;
+  border-color: var(--color-primary);
 }
+
+/* ============================================================
+   LAYOUT UTILITIES
+   ============================================================ */
 
 /* Loading overlay */
 .loading-overlay {
@@ -62,7 +123,7 @@ input[type="file"]:hover {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -76,6 +137,14 @@ input[type="file"]:hover {
   flex-wrap: wrap;
 }
 
+/* Filter section */
+.filter-section {
+  background: var(--color-surface);
+  padding: 16px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
 /* Responsive map */
 @media (max-width: 768px) {
   .leaflet-container {
@@ -83,7 +152,9 @@ input[type="file"]:hover {
   }
 }
 
-/* Status indicators */
+/* ============================================================
+   STATUS INDICATORS
+   ============================================================ */
 .status-polling {
   display: inline-flex;
   align-items: center;
@@ -96,7 +167,7 @@ input[type="file"]:hover {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #4caf50;
+  background: var(--color-success);
   animation: pulse 2s infinite;
 }
 
@@ -109,13 +180,33 @@ input[type="file"]:hover {
   }
 }
 
-/* Download link styling */
+/* Job status card */
+.job-status {
+  background: var(--color-info-bg);
+  padding: 16px;
+  border-radius: 4px;
+  border-left: 4px solid var(--color-info);
+}
+
+.job-status.complete {
+  background: var(--color-success-bg);
+  border-left-color: var(--color-success);
+}
+
+.job-status.error {
+  background: var(--color-error-bg);
+  border-left-color: var(--color-error);
+}
+
+/* ============================================================
+   DOWNLOAD LINK
+   ============================================================ */
 a.download-link {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: #1976d2;
+  background: var(--color-primary);
   color: white;
   text-decoration: none;
   border-radius: 4px;
@@ -124,37 +215,11 @@ a.download-link {
 }
 
 a.download-link:hover {
-  background: #1565c0;
+  background: var(--color-primary-dark);
 }
 
 a.download-link.disabled {
-  background: #ccc;
+  background: var(--color-border);
   cursor: not-allowed;
   pointer-events: none;
-}
-
-/* Filter section */
-.filter-section {
-  background: #f5f5f5;
-  padding: 16px;
-  border-radius: 4px;
-  margin-bottom: 16px;
-}
-
-/* Job status card */
-.job-status {
-  background: #e3f2fd;
-  padding: 16px;
-  border-radius: 4px;
-  border-left: 4px solid #1976d2;
-}
-
-.job-status.complete {
-  background: #e8f5e9;
-  border-left-color: #4caf50;
-}
-
-.job-status.error {
-  background: #ffebee;
-  border-left-color: #f44336;
 }

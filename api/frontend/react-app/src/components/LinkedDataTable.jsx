@@ -88,7 +88,7 @@ function TraitsTab({ traits }) {
               </TableCell>
             </TableRow>
           ) : traits.map((t, i) => (
-            <TableRow key={i} hover>
+            <TableRow key={i} sx={{ '&:hover': { bgcolor: '#F6E9C9' } }}>
               {COLS.map(c => (
                 <TableCell key={c.key} sx={{ whiteSpace: 'nowrap' }}>
                   {c.date
@@ -125,7 +125,7 @@ function GranulesTab({ granules }) {
               </TableCell>
             </TableRow>
           ) : granules.map((g, i) => (
-            <TableRow key={i} hover>
+            <TableRow key={i} sx={{ '&:hover': { bgcolor: '#F6E9C9' } }}>
               <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{g.granule_id}</TableCell>
               <TableCell>{g.campaign_name || '—'}</TableCell>
               <TableCell>{g.sensor_name || '—'}</TableCell>

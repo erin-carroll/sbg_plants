@@ -1,3 +1,4 @@
+EMIT-colors*
 .terraform
 .terraform.lock.hcl
 terraform.tfvars

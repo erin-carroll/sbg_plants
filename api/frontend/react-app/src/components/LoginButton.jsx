@@ -5,11 +5,17 @@ import { redirectToLogin } from "../utils/auth";
 
 export default function LoginButton() {
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <Box sx={{ minHeight: '100vh', backgroundColor: 'grey.100' }}>
       {/* Same navbar as the app, but no controls */}
       <AppBar position="fixed" elevation={2}>
-        <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', minHeight: 56 }}>
+          <Typography variant="h6" sx={{
+            fontWeight: 700, whiteSpace: 'nowrap', fontSize: '1.5rem',
+            background: 'linear-gradient(90deg, #37598C, #0091DB, #3E8450, #E8CC56, #DB9D3A, #C16B49)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>
             VSWIR Plants
           </Typography>
         </Toolbar>
@@ -30,10 +36,11 @@ export default function LoginButton() {
       >
         <Box
           sx={{
-            background: 'white',
+            bgcolor: 'background.paper',
             borderRadius: 2,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            borderLeft: '4px solid #1976d2',
+            boxShadow: 3,
+            borderLeft: '4px solid',
+            borderColor: 'primary.main',
             p: 5,
             maxWidth: 400,
             width: '100%',
@@ -46,7 +53,7 @@ export default function LoginButton() {
               width: 56,
               height: 56,
               borderRadius: '50%',
-              backgroundColor: '#e3f2fd',
+              backgroundColor: 'primary.light',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -54,19 +61,26 @@ export default function LoginButton() {
               mb: 2,
             }}
           >
-            <LoginIcon sx={{ color: '#1976d2', fontSize: 28 }} />
+            <LoginIcon sx={{ color: 'primary.contrastText', fontSize: 28 }} />
           </Box>
 
-          <Typography variant="h5" sx={{ fontWeight: 600, mb: 1, color: '#1a1a1a' }}>
+          <Typography variant="h5" sx={{
+            fontWeight: 700, mb: 1,
+            background: 'linear-gradient(90deg, #37598C, #0091DB, #3E8450, #E8CC56, #DB9D3A, #C16B49)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>
             VSWIR Plants
           </Typography>
 
-          <Typography variant="body2" sx={{ color: '#666', mb: 4 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
             Sign in to access plant spectral data and analysis tools.
           </Typography>
 
           <Button
             variant="contained"
+            color="primary"
             size="large"
             onClick={redirectToLogin}
             startIcon={<LoginIcon />}
@@ -76,8 +90,6 @@ export default function LoginButton() {
               fontWeight: 600,
               py: 1.5,
               fontSize: '1rem',
-              backgroundColor: '#1976d2',
-              '&:hover': { backgroundColor: '#1565c0' },
             }}
           >
             Sign in with VSWIR Plants SSO

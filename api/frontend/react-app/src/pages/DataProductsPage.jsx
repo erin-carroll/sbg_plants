@@ -135,7 +135,7 @@ function DataProductsPage() {
           </Box>
 
           <Box sx={{ display: filterCollapsed ? 'none' : 'flex', flexDirection: 'column', gap: 2, px: 2, pb: 2, flex: 1, overflowY: 'auto' }}>
-            <StagingToggle />
+            <StagingToggle onToggle={() => { q.handleReset(); job.reset(); spectra.reset(); setRunDisabled(false); setExtractDisabled(false); clearDrawnRef?.current?.(); }} />
 
             <LinkedFilterPanel
               campaignName={q.campaignName}

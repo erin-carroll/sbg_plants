@@ -115,7 +115,7 @@ function LinkedQueryPage() {
 
           {/* Filter content — hidden when collapsed */}
           <Box sx={{ display: filterCollapsed ? 'none' : 'flex', flexDirection: 'column', gap: 2, px: 2, pb: 2, flex: 1, overflowY: 'auto' }}>
-            <StagingToggle />
+            <StagingToggle onToggle={() => { q.handleReset(); spectra.reset(); setExtractDisabled(false); clearDrawnRef?.current?.(); }} />
 
             <LinkedFilterPanel
               campaignName={q.campaignName}

@@ -1,35 +1,36 @@
 import React from 'react';
-import { Paper, Typography, Button, Link, Box, Chip } from '@mui/material';
+import { Paper, Typography, Button, Box, Chip, useTheme } from '@mui/material';
 import { Download as DownloadIcon, HourglassEmpty, CheckCircle, PlayArrow, Error as ErrorIcon } from '@mui/icons-material';
 
-const getStatusConfig = (status) => {
+const getStatusConfig = (status, theme) => {
   switch (status) {
     case 'complete':
-      return { color: '#e8f5e9', borderColor: '#4caf50', icon: <CheckCircle sx={{ color: '#4caf50', mr: 1 }} />, label: 'Complete', chipColor: 'success' };
+      return { bgcolor: theme.palette.success.light, borderColor: theme.palette.success.main, icon: <CheckCircle sx={{ color: 'success.main', mr: 1 }} />, label: 'Complete', chipColor: 'success' };
     case 'running':
-      return { color: '#fff3e0', borderColor: '#ff9800', icon: <PlayArrow sx={{ color: '#ff9800', mr: 1 }} />, label: 'Running', chipColor: 'warning' };
+      return { bgcolor: theme.palette.warning.light, borderColor: theme.palette.warning.main, icon: <PlayArrow sx={{ color: 'warning.main', mr: 1 }} />, label: 'Running', chipColor: 'warning' };
     case 'failed':
-      return { color: '#ffebee', borderColor: '#f44336', icon: <ErrorIcon sx={{ color: '#f44336', mr: 1 }} />, label: 'Failed', chipColor: 'error' };
+      return { bgcolor: theme.palette.error.light, borderColor: theme.palette.error.main, icon: <ErrorIcon sx={{ color: 'error.main', mr: 1 }} />, label: 'Failed', chipColor: 'error' };
     case 'queued':
     default:
-      return { color: '#e3f2fd', borderColor: '#1976d2', icon: <HourglassEmpty sx={{ color: '#1976d2', mr: 1 }} />, label: 'Queued', chipColor: 'info' };
+      return { bgcolor: theme.palette.info.light, borderColor: theme.palette.info.main, icon: <HourglassEmpty sx={{ color: 'info.main', mr: 1 }} />, label: 'Queued', chipColor: 'info' };
   }
 };
 
 function SpectraJobStatus({ jobsBySensor, sensorStatuses }) {
+  const theme = useTheme();
   if (!jobsBySensor || Object.keys(jobsBySensor).length === 0) return null;
 
   return (
     <Box>
       {Object.entries(jobsBySensor).map(([sensorKey, jobId]) => {
         const state = sensorStatuses[sensorKey] ?? { status: 'queued', rowsProcessed: 0 };
-        const statusConfig = getStatusConfig(state.status);
+        const statusConfig = getStatusConfig(state.status, theme);
 
         return (
           <Paper
             key={sensorKey}
             elevation={1}
-            sx={{ p: 2, mb: 2, bgcolor: statusConfig.color, borderLeft: `4px solid ${statusConfig.borderColor}` }}
+            sx={{ p: 2, mb: 2, bgcolor: 'background.paper', borderLeft: `4px solid ${statusConfig.borderColor}` }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               {statusConfig.icon}
