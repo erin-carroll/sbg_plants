@@ -77,6 +77,28 @@ def _run_qaqc(batch_id: str):
 
     report, has_errors = run_checks(context)
 
+    # ── 3b. Inject bundle summary counts ─────────────────────────────────────
+    geojson_features = geojson.get("features", [])
+    unique_plots = len({
+        (f["properties"]["campaign_name"], f["properties"]["plot_name"])
+        for f in geojson_features
+    })
+    sample_key_cols = ["campaign_name", "plot_name", "collection_date", "sample_name"]
+    existing_sample_cols = [c for c in sample_key_cols if c in df_traits.columns]
+    unique_samples = int(df_traits.drop_duplicates(subset=existing_sample_cols).shape[0]) if existing_sample_cols else 0
+    trait_rows = int(df_traits.shape[0])
+
+    report["_summary"] = {
+        "campaigns":          int(df_campaign["campaign_name"].nunique()) if "campaign_name" in df_campaign.columns else 0,
+        "sensors":            int(df_campaign["sensor_name"].nunique())   if "sensor_name"   in df_campaign.columns else 0,
+        "granules":           int(df_granule["granule_id"].nunique())     if "granule_id"    in df_granule.columns  else 0,
+        "plots":              unique_plots,
+        "plot_granule_combos": len(geojson_features),
+        "samples":            unique_samples,
+        "traits":             trait_rows,
+        "pixels":             int(df_spectra.shape[0]),
+    }
+
     # ── 4. Write full report to S3 ────────────────────────────────────────────
     final_status = "QAQC_FAIL" if has_errors else "QAQC_PASS"
     s3_key       = write_report(batch_id, final_status, report)

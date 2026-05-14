@@ -51,7 +51,7 @@ def _check_no_existing_sensor_campaigns(df: pd.DataFrame, context: CheckContext)
         if key in context.db["campaign_sensor_set"]:
             errors.append({
                 "file": "campaign_metadata", "row": int(idx + 2), "column": None,
-                "message": "sensor_campaign already exists in database",
+                "message": f"({row['campaign_name']!r}, {row['sensor_name']!r}) already exists in database",
             })
     return errors
 

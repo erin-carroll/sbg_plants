@@ -22,8 +22,10 @@
     "utc_time",
     "cosine_i"
   ],
-  "nullable_cols": ["raw_cosine_i"],
-  "enum_cols": {},
+  "nullable_cols": [],
+  "enum_cols": {
+    "campaign_name": "CAMPAIGN_name"
+  },
   "type_cols": {
     "lon":        "float",
     "lat":        "float",

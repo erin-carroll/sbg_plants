@@ -21,7 +21,7 @@ CHUNK_SIZE = 5000
 STAGING_TABLES = [
     "extracted_spectra", "pixel", "leaf_traits", "sample",
     "insitu_plot_event", "plot_raster_intersect", "plot",
-    "plot_shape", "granule", "sensor_campaign", "campaign",
+    "plot_shape", "granule", "sensor_campaign", "doi", "campaign",
 ]
 
 
@@ -35,6 +35,7 @@ def promote(conn, batch_id: str):
     with conn:
         logger.info("Promoting campaign + sensor_campaign")
         _promote_campaign(engine, conn, batch_id)
+        _promote_doi(engine, conn, batch_id)
 
         logger.info("Promoting granule")
         _promote_granule(engine, batch_id)
@@ -65,12 +66,26 @@ def promote(conn, batch_id: str):
 
 def _promote_campaign(engine, conn, batch_id: str):
     df = pd.read_sql(
-        "SELECT campaign_name, primary_funding_source, data_repository, doi, taxa_system "
+        "SELECT campaign_name, primary_funding_source, data_repository, taxa_system "
         "FROM vswir_plants_staging.campaign WHERE batch_id = %s",
         conn, params=(batch_id,)
     )
     df.to_sql(
         "campaign", engine, schema="vswir_plants",
+        if_exists="append", index=False, method="multi",
+    )
+
+
+def _promote_doi(engine, conn, batch_id: str):
+    df = pd.read_sql(
+        "SELECT doi, campaign_name, doi_type, doi_subtype "
+        "FROM vswir_plants_staging.doi WHERE batch_id = %s",
+        conn, params=(batch_id,)
+    )
+    if df.empty:
+        return
+    df.to_sql(
+        "doi", engine, schema="vswir_plants",
         if_exists="append", index=False, method="multi",
     )
 
@@ -241,7 +256,7 @@ def _promote_pixels(conn, batch_id: str, plot_id_map: dict) -> dict:
         "plot_id", "granule_id", "glt_row", "glt_column", "shade_mask",
         "path_length", "to_sensor_azimuth", "to_sensor_zenith",
         "to_sun_azimuth", "to_sun_zenith", "solar_phase", "slope", "aspect",
-        "utc_time", "cosine_i", "raw_cosine_i", "lon", "lat", "elevation",
+        "utc_time", "cosine_i", "lon", "lat", "elevation",
     ]
     pixel_id_map = {}
     offset = 0

@@ -25,6 +25,7 @@
     "error_type"
   ],
   "enum_cols": {
+    "campaign_name":        "CAMPAIGN_name",
     "plot_veg_type":        "VEGETATION_type",
     "subplot_cover_method": "SUBPLOT_cover_method",
     "taxa":                 "TAXA",
@@ -42,7 +43,7 @@
   "type_cols": {
     "collection_date":   "date",
     "value":             "float",
-    "sample_fc_percent": "float",
+    "sample_fc_percent": "int",
     "floristic_survey":  "bool"
   },
   "pk_cols": ["plot_name", "campaign_name", "collection_date", "sample_name", "trait"]

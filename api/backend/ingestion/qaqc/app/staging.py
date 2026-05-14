@@ -31,6 +31,7 @@ def load_all(conn, batch_id: str, dfs: dict, geojson: dict) -> dict:
 
     row_counts = {}
     row_counts["campaign"]              = _load_campaign(engine, dfs["campaign_metadata"], batch_id)
+    row_counts["doi"]                   = _load_doi(engine, dfs["campaign_metadata"], batch_id)
     row_counts["sensor_campaign"]       = _load_sensor_campaign(raw, dfs["campaign_metadata"], batch_id)
     row_counts["granule"]               = _load_granule(engine, dfs["granule_metadata"], batch_id)
     shape_id_map                        = _load_plot_shapes(raw, engine, geojson, batch_id)
@@ -53,13 +54,36 @@ def load_all(conn, batch_id: str, dfs: dict, geojson: dict) -> dict:
 
 def _load_campaign(engine, df: pd.DataFrame, batch_id: str) -> int:
     out = (
-        df[["campaign_name", "primary_funding_source", "data_repository", "doi", "taxa_system"]]
+        df[["campaign_name", "primary_funding_source", "data_repository", "taxa_system"]]
         .drop_duplicates("campaign_name")
         .assign(batch_id=batch_id)
         .replace("", None)
     )
     out.to_sql(
         "campaign", engine, schema="vswir_plants_staging",
+        if_exists="append", index=False, method="multi",
+    )
+    return len(out)
+
+
+def _load_doi(engine, df: pd.DataFrame, batch_id: str) -> int:
+    """
+    Insert DOI rows from campaign_metadata.csv into the doi staging table.
+    Each row in the CSV that has a non-blank doi value becomes one doi record.
+    doi_type and doi_subtype are nullable.
+    """
+    doi_cols = ["campaign_name", "doi", "doi_type", "doi_subtype"]
+    available = [c for c in doi_cols if c in df.columns]
+    out = (
+        df[available]
+        .replace("", None)
+        .dropna(subset=["doi"])
+        .assign(batch_id=batch_id)
+    )
+    if out.empty:
+        return 0
+    out.to_sql(
+        "doi", engine, schema="vswir_plants_staging",
         if_exists="append", index=False, method="multi",
     )
     return len(out)
@@ -254,7 +278,7 @@ def _load_pixels(conn, df: pd.DataFrame, plot_id_map: dict, batch_id: str) -> di
         "campaign_name", "plot_name", "granule_id", "glt_row", "glt_column",
         "shade_mask", "path_length", "to_sensor_azimuth", "to_sensor_zenith",
         "to_sun_azimuth", "to_sun_zenith", "solar_phase", "slope", "aspect",
-        "utc_time", "cosine_i", "raw_cosine_i", "lon", "lat", "elevation",
+        "utc_time", "cosine_i", "lon", "lat", "elevation",
     ]
     out = (
         df[[c for c in pixel_cols if c in df.columns]]
@@ -267,7 +291,7 @@ def _load_pixels(conn, df: pd.DataFrame, plot_id_map: dict, batch_id: str) -> di
         "plot_id", "granule_id", "glt_row", "glt_column", "shade_mask",
         "path_length", "to_sensor_azimuth", "to_sensor_zenith",
         "to_sun_azimuth", "to_sun_zenith", "solar_phase", "slope", "aspect",
-        "utc_time", "cosine_i", "raw_cosine_i", "lon", "lat", "elevation", "batch_id",
+        "utc_time", "cosine_i", "lon", "lat", "elevation", "batch_id",
     ]
     insert_df = out[[c for c in db_cols if c in out.columns]]
 

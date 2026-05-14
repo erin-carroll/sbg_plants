@@ -83,14 +83,15 @@ function LinkedFilterPanel({
       </Stack>
 
       {/* Campaign */}
-      <TextField
-        label="Campaign name"
+      <Autocomplete
         size="small"
-        fullWidth
-        value={campaignName}
-        onChange={e => setCampaignName(e.target.value)}
+        options={ENUMS.campaign_name}
+        value={campaignName || null}
+        onChange={(_, newValue) => setCampaignName(newValue ?? '')}
         sx={{ mb: 2 }}
-        placeholder="e.g. East River 2018"
+        renderInput={(params) => (
+          <TextField {...params} label="Campaign name" />
+        )}
       />
 
       {/* Spatial filter */}

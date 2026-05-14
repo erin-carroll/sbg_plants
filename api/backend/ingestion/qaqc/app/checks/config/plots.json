@@ -13,6 +13,7 @@
     "plot_method"
   ],
   "enum_props": {
+    "campaign_name":      "CAMPAIGN_name",
     "extraction_method":  "EXTRACTION_method",
     "delineation_method": "DELINEATION_method",
     "plot_method":        "PLOT_method"

@@ -14,6 +14,10 @@
 // ---------------------------------------------------------------------------
 
 export const ENUMS = {
+  campaign_name: [
+    'East River 2018',
+  ],
+
   sensor_name: [
     'NEON AIS 1',
     'NEON AIS 2',
@@ -148,7 +152,7 @@ export const VIEW_CONFIG = {
     hideExtract: false,
     filters: [
       { id: 'plot_name',     label: 'Plot Name:',     type: 'text', placeholder: 'e.g., 276-ER18,001-ER18' },
-      { id: 'campaign_name', label: 'Campaign Name:', type: 'text', placeholder: 'e.g., East River 2018' },
+      { id: 'campaign_name', label: 'Campaign Name:', type: 'enum', options: ENUMS.campaign_name },
       { id: 'site_id',       label: 'Site ID:',       type: 'text', placeholder: 'e.g., CRBU' },
       { id: 'plot_method',   label: 'Plot Method:',   type: 'enum', options: ENUMS.plot_method },
     ],
@@ -162,7 +166,7 @@ export const VIEW_CONFIG = {
     displayName: 'Traits',
     hideExtract: true,
     filters: [
-      { id: 'campaign_name',       label: 'Campaign Name:',       type: 'text', placeholder: 'e.g., East River 2018' },
+      { id: 'campaign_name',       label: 'Campaign Name:',       type: 'enum', options: ENUMS.campaign_name },
       { id: 'site_id',             label: 'Site ID:',             type: 'text', placeholder: 'e.g., CRBU' },
       { id: 'plot_name',           label: 'Plot Name:',           type: 'text', placeholder: 'e.g., 276-ER18,001-ER18' },
       { id: 'sample_name',         label: 'Sample Name:',         type: 'text', placeholder: 'e.g., 021-ER18_Salixwolfii' },
@@ -195,7 +199,7 @@ export const VIEW_CONFIG = {
     displayName: 'Granules',
     hideExtract: false,
     filters: [
-      { id: 'campaign_name',    label: 'Campaign Name:',    type: 'text', placeholder: 'e.g., East River 2018' },
+      { id: 'campaign_name',    label: 'Campaign Name:',    type: 'enum', options: ENUMS.campaign_name },
       { id: 'sensor_name',      label: 'Sensor Name:',      type: 'enum', options: ENUMS.sensor_name },
       { id: 'cloudy_conditions', label: 'Cloud Conditions:', type: 'enum', options: ENUMS.cloudy_conditions },
       { id: 'cloud_type',       label: 'Cloud Type:',       type: 'enum', options: ENUMS.cloud_type },

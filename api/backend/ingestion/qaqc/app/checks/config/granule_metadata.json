@@ -16,6 +16,7 @@
     "granule_refl_url"
   ],
   "enum_cols": {
+    "campaign_name":     "CAMPAIGN_name",
     "sensor_name":       "Sensor_name",
     "cloudy_conditions": "CLOUD_conditions",
     "cloud_type":        "CLOUD_type"

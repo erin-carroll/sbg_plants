@@ -68,6 +68,7 @@ GRANT SELECT ON vswir_plants.extracted_spectra      TO ingestion_staging;
 GRANT SELECT ON vswir_plants.insitu_plot_event      TO ingestion_staging;
 GRANT SELECT ON vswir_plants.sample                 TO ingestion_staging;
 GRANT SELECT ON vswir_plants.leaf_traits            TO ingestion_staging;
+GRANT SELECT ON vswir_plants.doi                    TO ingestion_staging;
 
 -- ---------------------------------------------------------------------------
 -- ingestion_promotion
@@ -95,6 +96,7 @@ GRANT SELECT, INSERT ON vswir_plants.sample                TO ingestion_promotio
 GRANT SELECT, INSERT ON vswir_plants.leaf_traits           TO ingestion_promotion;
 GRANT SELECT, INSERT ON vswir_plants.pixel                 TO ingestion_promotion;
 GRANT SELECT, INSERT ON vswir_plants.extracted_spectra     TO ingestion_promotion;
+GRANT SELECT, INSERT ON vswir_plants.doi                   TO ingestion_promotion;
 
 -- Production: sequences for serial ID generation on promotion
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA vswir_plants TO ingestion_promotion;

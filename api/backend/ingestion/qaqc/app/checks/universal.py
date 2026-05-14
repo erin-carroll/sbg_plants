@@ -267,7 +267,7 @@ def check_not_in_db(
     for idx, row in already_exists.iterrows():
         errors.append(_err(
             file_name,
-            f"{key_col} already exists in database",
+            f"'{row[key_col]}' already exists in database",
             row=idx + 2,
             column=column or key_col,
         ))

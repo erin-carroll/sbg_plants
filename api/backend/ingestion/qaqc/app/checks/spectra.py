@@ -137,8 +137,9 @@ def _check_per_row(
     errors          = []
     warnings        = []
     pk_seen         = set()
-    out_of_bounds   = []   # row numbers where lon/lat are outside WGS84 range
-    outside_polygon = []   # (row_number, distance_m) — warning, not error
+    out_of_bounds        = []   # row numbers where lon/lat are outside WGS84 range
+    outside_polygon      = []   # (row_number, distance_m) — footprint also misses
+    centroid_only_misses = []   # (row_number, distance_m) — centroid outside but footprint overlaps
 
     for idx, row in df.iterrows():
         campaign = row["campaign_name"]
@@ -183,17 +184,22 @@ def _check_per_row(
             })
         pk_seen.add(pk)
 
-        row_out_of_bounds, row_outside_polygon = _check_coordinates(
+        row_out_of_bounds, row_outside_polygon, row_centroid_only = _check_coordinates(
             row, all_shape_map[int_key], all_gsd_map.get(granule), idx
         )
-        out_of_bounds   += row_out_of_bounds
-        outside_polygon += row_outside_polygon
+        out_of_bounds        += row_out_of_bounds
+        outside_polygon      += row_outside_polygon
+        centroid_only_misses += row_centroid_only
 
     errors   += _summarise_coord_errors(
         out_of_bounds,
         "pixel(s) have lon/lat outside WGS84 bounds (-180..180, -90..90)",
     )
     warnings += _summarise_outside_polygon(outside_polygon)
+    warnings += _summarise_outside_polygon(
+        centroid_only_misses,
+        label="center outside plot shape but footprint overlaps (edge pixels)",
+    )
 
     return errors, warnings
 
@@ -243,63 +249,67 @@ def _check_coordinates(
     plot_geom,
     gsd: float | None,
     idx: int,
-) -> tuple[list[int], list[tuple[int, float]]]:
+) -> tuple[list[int], list[tuple[int, float]], list[tuple[int, float]]]:
     """
-    Check lon/lat for WGS84 bounds and pixel footprint intersection.
-    Returns (out_of_bounds_rows, outside_polygon_entries).
+    Check lon/lat for WGS84 bounds and pixel intersection with the plot shape.
+    Returns (out_of_bounds_rows, outside_polygon_entries, centroid_only_miss_entries).
 
-    outside_polygon_entries is a list of (row_number, distance_m) where
-    distance_m is the distance from the pixel centroid to the nearest point
-    on the polygon boundary — used to bucket violations by severity.
+    When GSD is known, always runs both checks:
+      - Point-in-polygon: centroid must be inside the plot
+      - Footprint-in-polygon: GSD×GSD square centred on centroid must intersect
 
-    When GSD is known, constructs a GSD × GSD square centred on the pixel
-    centroid and checks whether it intersects the plot polygon (matching
-    rioxarray's all_touched=True semantics).
+    Cases:
+      Point ✓               → passes, neither list populated
+      Point ✗, Footprint ✓  → edge pixel; goes into centroid_only_miss_entries
+      Point ✗, Footprint ✗  → clearly outside; goes into outside_polygon_entries
 
-    When GSD is unknown, falls back to a plain centroid intersects check.
+    When GSD is unknown, only the point check is run (outside_polygon_entries).
 
-    Buffers and distances are computed in a local azimuthal equidistant
-    projection centred on the point, avoiding the latitude-dependent
-    degree-to-metre error of a flat 1/111320 factor.
+    Distances are computed in a local azimuthal equidistant projection to avoid
+    the latitude-dependent degree-to-metre error of a flat approximation.
     """
     try:
         lon = float(row["lon"])
         lat = float(row["lat"])
     except (ValueError, TypeError):
-        return [], []
+        return [], [], []
 
     if not (-180 <= lon <= 180 and -90 <= lat <= 90):
-        return [idx + 2], []
+        return [idx + 2], [], []
 
     pt = Point(lon, lat)
 
     # Build a local azimuthal equidistant CRS centred on this point.
-    # All distances/areas are accurate at the centre, which is all we need.
     aeqd = CRS.from_proj4(
         f"+proj=aeqd +lat_0={lat} +lon_0={lon} +datum=WGS84 +units=m"
     )
-    to_aeqd   = Transformer.from_crs("EPSG:4326", aeqd, always_xy=True).transform
-    to_wgs84  = Transformer.from_crs(aeqd, "EPSG:4326", always_xy=True).transform
+    to_aeqd  = Transformer.from_crs("EPSG:4326", aeqd, always_xy=True).transform
+    to_wgs84 = Transformer.from_crs(aeqd, "EPSG:4326", always_xy=True).transform
+
+    point_intersects = plot_geom.intersects(pt)
+
+    if point_intersects:
+        return [], [], []
+
+    # Centroid is outside — compute distance for bucketing.
+    plot_geom_proj = transform(to_aeqd, plot_geom)
+    dist_m = plot_geom_proj.exterior.distance(transform(to_aeqd, pt))
 
     if gsd is not None:
-        # Buffer in projected space (metres), then reproject to 4326 for
-        # the intersection test against plot_geom (which lives in 4326).
-        pt_proj         = transform(to_aeqd, pt)          # → (0, 0) in AEQD
-        half            = float(gsd) / 2
-        footprint_proj  = pt_proj.buffer(half, cap_style=3)   # square, metres
-        pixel_footprint = transform(to_wgs84, footprint_proj)  # back to 4326
-        intersects      = plot_geom.intersects(pixel_footprint)
+        pt_proj        = transform(to_aeqd, pt)
+        half           = float(gsd) / 2
+        footprint_proj = pt_proj.buffer(half, cap_style=3)   # square, metres
+        pixel_footprint = transform(to_wgs84, footprint_proj)
+        footprint_intersects = plot_geom.intersects(pixel_footprint)
+        if footprint_intersects:
+            # Edge pixel — centroid outside but footprint overlaps
+            return [], [], [(idx + 2, dist_m)]
+        else:
+            # Clearly outside
+            return [], [(idx + 2, dist_m)], []
     else:
-        intersects = plot_geom.intersects(pt)
-
-    if not intersects:
-        # Distance from the plot exterior to the centroid, in metres.
-        # Computed in projected space to avoid the flat-earth approximation.
-        plot_geom_proj = transform(to_aeqd, plot_geom)
-        dist_m = plot_geom_proj.exterior.distance(transform(to_aeqd, pt))
-        return [], [(idx + 2, dist_m)]
-
-    return [], []
+        # No GSD — only point check available
+        return [], [(idx + 2, dist_m)], []
 
 # if gsd is in degrees
 # def _check_coordinates(
@@ -341,17 +351,12 @@ def _check_coordinates(
 
 def _summarise_outside_polygon(
     outside_polygon: list[tuple[int, float]],
+    label: str = "footprint outside plot shape boundary",
 ) -> list[dict]:
     """
-    Summarise pixel footprint violations bucketed by distance from the polygon
+    Summarise pixel intersection violations bucketed by distance from the polygon
     boundary. Helps distinguish reprojection artefacts (< 1m) from genuine
     data errors (> 10m).
-
-    Buckets:
-      < 1m    — likely floating point / reprojection artefact
-      1–10m   — possible polygon alignment issue, worth reviewing
-      10–100m — outside normal tolerance, probable data error
-      > 100m  — clearly misplaced pixel
     """
     if not outside_polygon:
         return []
@@ -369,17 +374,17 @@ def _summarise_outside_polygon(
                 bucket.append(row_num)
                 break
 
-    total   = len(outside_polygon)
-    lines   = [f"{total} pixel(s) have footprint outside plot shape boundary:"]
+    total = len(outside_polygon)
+    lines = [f"{total} pixel(s) have {label}:"]
 
-    for _, label, bucket in buckets:
+    for _, bucket_label, bucket in buckets:
         if not bucket:
             continue
         sample = bucket[:5]
         extra  = len(bucket) - 5
         suffix = f" (and {extra} more)" if extra > 0 else ""
         rows   = ", ".join(str(r) for r in sample)
-        lines.append(f"  {label}: {len(bucket)} pixel(s) at rows: {rows}{suffix}")
+        lines.append(f"  {bucket_label}: {len(bucket)} pixel(s) at rows: {rows}{suffix}")
 
     return [{"file": "spectra", "row": None, "column": None, "message": "\n".join(lines)}]
 

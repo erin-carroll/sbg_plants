@@ -104,6 +104,10 @@ CREATE TYPE vswir_plants."TAXA" AS ENUM (
     'Not recorded'
 ); 
 
+CREATE TYPE vswir_plants."CAMPAIGN_name" AS ENUM (
+    'East River 2018'
+);
+
 
 -- should we add version to this???
 CREATE TYPE vswir_plants."ELEVATION_source" AS ENUM (
@@ -274,7 +278,9 @@ CREATE TYPE vswir_plants."Trait" AS ENUM (
     'Copper',
     'Zinc',
     'Aluminum',
-    'Sodium'
+    'Sodium',
+    'd13c',
+    'Carbon'
 );
 
 CREATE TYPE vswir_plants."Trait_method" AS ENUM (

@@ -9,6 +9,23 @@
 --   6. No output tables (output_pixel_fc, output_pixel_rfl) — never ingested
 -- ─────────────────────────────────────────────────────────────────────────────
 
+-- ── drop existing tables in reverse dependency order ─────────────────────────
+
+DROP TABLE IF EXISTS vswir_plants_staging.output_pixel_data_products CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.output_pixel_rfl CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.extracted_spectra CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.pixel CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.leaf_traits CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.sample CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.insitu_plot_event CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.plot_raster_intersect CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.plot_shape CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.plot CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.granule CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.sensor_campaign CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.doi CASCADE;
+DROP TABLE IF EXISTS vswir_plants_staging.campaign CASCADE;
+
 CREATE SCHEMA IF NOT EXISTS vswir_plants_staging;
 
 -- ── campaign ──────────────────────────────────────────────────────────────────
@@ -17,10 +34,23 @@ CREATE TABLE vswir_plants_staging.campaign (
     campaign_name          VARCHAR                     NOT NULL,
     primary_funding_source VARCHAR                     NOT NULL,
     data_repository        vswir_plants."Repository",
-    doi                    VARCHAR,
     taxa_system            VARCHAR,
     batch_id               VARCHAR                     NOT NULL,
     CONSTRAINT staging_campaign_pk PRIMARY KEY (campaign_name, batch_id)
+);
+
+-- ── doi ───────────────────────────────────────────────────────────────────────
+
+CREATE TABLE vswir_plants_staging.doi (
+    doi           VARCHAR NOT NULL,
+    campaign_name VARCHAR NOT NULL,
+    doi_type      VARCHAR,
+    doi_subtype   VARCHAR,
+    batch_id      VARCHAR NOT NULL,
+    CONSTRAINT staging_doi_pk PRIMARY KEY (doi, batch_id),
+    CONSTRAINT staging_doi_campaign_fkey FOREIGN KEY (campaign_name, batch_id)
+        REFERENCES vswir_plants_staging.campaign(campaign_name, batch_id)
+        ON DELETE CASCADE
 );
 
 -- ── sensor_campaign ───────────────────────────────────────────────────────────
@@ -128,7 +158,6 @@ CREATE TABLE vswir_plants_staging.pixel (
     aspect            FLOAT4  NOT NULL,
     utc_time          FLOAT4  NOT NULL,
     cosine_i          FLOAT4,
-    raw_cosine_i      FLOAT4,
     lon               FLOAT4  NOT NULL,
     lat               FLOAT4  NOT NULL,
     elevation         FLOAT4  NOT NULL,

@@ -1,27 +1,28 @@
 -- multiple taxa_systems, varchar array or list multiple in the one column
 CREATE TABLE vswir_plants.campaign (
-    campaign_name VARCHAR PRIMARY KEY,
+    campaign_name vswir_plants."CAMPAIGN_name" PRIMARY KEY,
     primary_funding_source VARCHAR NOT NULL,
     data_repository vswir_plants."Repository",
-    -- doi VARCHAR,
     taxa_system VARCHAR
 );
 
 -- doi table, neon dois change on a yearly basis
 -- one campaign many dois
 -- what level do we integrate dois, campaign, trait etc
--- CREATE TABLE vswir_plants.doi (
---     doi VARCHAR PRIMARY KEY,
---     campaign_name VARCHAR NOT NULL,
---     CONSTRAINT doi_campaign_key FOREIGN KEY (campaign_name)
---         REFERENCES vswir_plants.campaign(campaign_name)
---         ON DELETE CASCADE,
---     CONSTRAINT sensor_campaign_pk PRIMARY KEY (doi)
--- );
+CREATE TABLE vswir_plants.doi (
+    doi VARCHAR PRIMARY KEY,
+    campaign_name vswir_plants."CAMPAIGN_name" NOT NULL,
+    doi_type VARCHAR,
+    doi_subtype VARCHAR,
+    CONSTRAINT doi_campaign_key FOREIGN KEY (campaign_name)
+        REFERENCES vswir_plants.campaign(campaign_name)
+        ON DELETE CASCADE,
+    CONSTRAINT doi_pk PRIMARY KEY (doi)
+);
 
 -- elevation source does it need a version?
 CREATE TABLE vswir_plants.sensor_campaign (
-    campaign_name VARCHAR NOT NULL,
+    campaign_name vswir_plants."CAMPAIGN_name" NOT NULL,
     sensor_name vswir_plants."Sensor_name" NOT NULL,
     elevation_source vswir_plants."ELEVATION_source" NOT NULL,
     wavelength_center FLOAT4[] NOT NULL,
@@ -35,7 +36,7 @@ CREATE TABLE vswir_plants.sensor_campaign (
 
 CREATE TABLE vswir_plants.plot (
     plot_id SERIAL PRIMARY KEY,
-    campaign_name VARCHAR NOT NULL,
+    campaign_name vswir_plants."CAMPAIGN_name" NOT NULL,
     site_id VARCHAR NOT NULL,
     plot_name VARCHAR NOT NULL,
     plot_method vswir_plants."PLOT_method",
@@ -50,7 +51,7 @@ CREATE TABLE vswir_plants.plot (
 -- remove raster_epsg everything has to be wgs 84/ epsg 4326?
 CREATE TABLE vswir_plants.granule (
     granule_id VARCHAR PRIMARY KEY,
-    campaign_name VARCHAR NOT NULL,
+    campaign_name vswir_plants."CAMPAIGN_name" NOT NULL,
     sensor_name vswir_plants."Sensor_name" NOT NULL,
     acquisition_start_time time NOT NULL,
     acquisition_date DATE NOT NULL,
@@ -116,17 +117,14 @@ CREATE TABLE vswir_plants.pixel (
     aspect FLOAT4 NOT NULL,
     utc_time FLOAT4 NOT NULL,
     cosine_i FLOAT4 NOT NULL,
-    -- raw_cosine_i FLOAT4, -- needs to be not null in the future? remove
     lon FLOAT4 NOT NULL, 
     lat FLOAT4 NOT NULL,
-    -- geom geometry(POINT, 4326) NOT NULL, -- point, or polygon with buffer based on gsd assuming this is pixel center
     elevation FLOAT4 NOT NULL,
     CONSTRAINT pixel_fkey FOREIGN KEY (plot_id, granule_id)
         REFERENCES vswir_plants.plot_raster_intersect(plot_id, granule_id)
         ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX pixel_idx ON vswir_plants.pixel (plot_id, granule_id, glt_row, glt_column);
-CREATE INDEX pixel_geom_idx ON vswir_plants.pixel USING GIST (geom);
 
 
 -- should I merge this into the pixel table?

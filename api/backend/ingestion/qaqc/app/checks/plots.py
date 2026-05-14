@@ -80,7 +80,7 @@ def check(context: CheckContext) -> CheckResult:
             }
 
     _forward_plot_maps(plot_shape_map, plot_id_map, context)
-    warnings += _warn_existing_plots(plot_id_map, context)
+    errors  += _check_existing_plots(plot_id_map, context)
     return CheckResult("plots", len(features), errors, warnings)
 
 
@@ -221,23 +221,21 @@ def _check_feature_fk_and_uniqueness(
 
 # ── Forwarded output ───────────────────────────────────────────────────────────
 
-def _warn_existing_plots(plot_id_map: dict, context: CheckContext) -> list[dict]:
+def _check_existing_plots(plot_id_map: dict, context: CheckContext) -> list[dict]:
     """
-    Warn when a (campaign_name, plot_name) from the bundle already exists in
-    the production plot table. This is not an error — plots are reused across
-    granules and the staging insert uses ON CONFLICT DO NOTHING. It is worth
-    flagging so the submitter is aware their plot geometries will be compared
-    against the existing production record.
+    Error when a (campaign_name, plot_name) from the bundle already exists in
+    the production plot table. Plots cannot be re-ingested — each plot must be
+    unique in production.
     """
-    warnings = []
+    errors = []
     for (campaign_name, plot_name) in plot_id_map:
         if (campaign_name, plot_name) in context.db["plot_set"]:
-            warnings.append(_e(
+            errors.append(_e(
                 None,
                 f"(campaign_name='{campaign_name}', plot_name='{plot_name}') "
-                f"already exists in database — existing plot record will be reused",
+                f"already exists in database",
             ))
-    return warnings
+    return errors
 
 
 def _forward_plot_maps(
