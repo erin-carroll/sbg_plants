@@ -240,8 +240,29 @@ def _fetch_granules(plot_ids_page, granule_filters, schema: str):
 
     cte_sql, pixel_fragment, params = _granule_cte_and_where(granule_filters, plot_ids_page, schema)
 
+    # pixel_plot_counts groups by (granule_id, plot_id) to get per-plot pixel counts.
+    # plot_pixel_maps then collapses those into one row per granule as a JSON map —
+    # this prevents a fan-out when joining back to the main pixel aggregation.
+    # px_params are needed a second time for the pixel_plot_counts CTE.
+    px_clauses = []
+    px_params  = []
+    _build_array_in_clause("plot_id", plot_ids_page, px_clauses, px_params)
+    full_params = list(params) + px_params
+
     sql = f"""
-        {cte_sql}
+        {cte_sql},
+        pixel_plot_counts AS (
+            SELECT px.granule_id, px.plot_id, count(*) AS pixel_count
+            FROM "{schema}".pixel px
+            WHERE {pixel_fragment}
+            GROUP BY px.granule_id, px.plot_id
+        ),
+        plot_pixel_maps AS (
+            SELECT granule_id,
+                   json_object_agg(plot_id::text, pixel_count)::jsonb AS plot_pixel_map
+            FROM pixel_plot_counts
+            GROUP BY granule_id
+        )
         SELECT
             fg.granule_id,
             fg.campaign_name,
@@ -251,19 +272,22 @@ def _fetch_granules(plot_ids_page, granule_filters, schema: str):
             fg.cloudy_conditions,
             fg.cloud_type,
             array_agg(DISTINCT px.plot_id)              AS plot_ids,
-            array_agg(px.pixel_id ORDER BY px.pixel_id) AS pixel_ids
+            array_agg(px.pixel_id ORDER BY px.pixel_id) AS pixel_ids,
+            ppm.plot_pixel_map
         FROM filtered_granules fg
         JOIN "{schema}".pixel px ON px.granule_id = fg.granule_id
+        JOIN plot_pixel_maps ppm ON ppm.granule_id = fg.granule_id
         WHERE {pixel_fragment}
         GROUP BY
             fg.granule_id, fg.campaign_name, fg.sensor_name,
             fg.acquisition_date, fg.acquisition_start_time,
-            fg.cloudy_conditions, fg.cloud_type
+            fg.cloudy_conditions, fg.cloud_type,
+            ppm.plot_pixel_map
     """
     logger.debug("Fetch granules SQL: %s", sql)
 
     with get_connection() as conn:
-        df = pd.read_sql(sql, conn, params=params)
+        df = pd.read_sql(sql, conn, params=full_params)
 
     for col in ("plot_ids", "pixel_ids"):
         if col in df.columns:

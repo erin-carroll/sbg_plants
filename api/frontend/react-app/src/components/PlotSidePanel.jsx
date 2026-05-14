@@ -42,8 +42,10 @@ function SectionHeader({ title, count, open, onToggle }) {
   );
 }
 
-function GranuleCard({ g, open, onToggle }) {
-  const pixelCount = Array.isArray(g.pixel_ids) ? g.pixel_ids.length : null;
+function GranuleCard({ g, open, onToggle, plotId }) {
+  const pixelCount = (g.plot_pixel_map && plotId != null)
+    ? (g.plot_pixel_map[String(plotId)] ?? null)
+    : null;
   return (
     <Box sx={{ borderRadius: 1, border: '1px solid', borderColor: 'grey.200' }}>
       <Box
@@ -110,11 +112,8 @@ function PlotSidePanel({ plotId, traits, granules, onClose }) {
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-            Plot {plotId}
+            {present(plotName) ? plotName : `Plot ${plotId}`}
           </Typography>
-          {present(plotName) && (
-            <Typography variant="caption" color="text.secondary">{plotName}</Typography>
-          )}
         </Box>
         <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
       </Stack>
@@ -197,6 +196,7 @@ function PlotSidePanel({ plotId, traits, granules, onClose }) {
                     g={g}
                     open={openGranuleIdx === i}
                     onToggle={() => setOpenGranuleIdx(openGranuleIdx === i ? null : i)}
+                    plotId={plotId}
                   />
                 ))}
               </Stack>
