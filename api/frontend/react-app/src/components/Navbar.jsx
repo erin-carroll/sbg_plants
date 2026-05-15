@@ -44,7 +44,7 @@ function Navbar({ showControls = true }) {
             <Tab
               label="Query"
               value="/"
-              sx={{ textTransform: 'none', fontWeight: 500, color: 'rgba(255,255,255,0.8)',
+              sx={{ textTransform: 'none', fontWeight: 600, color: 'rgba(255,255,255,0.8)',
                     '&.Mui-selected': { color: '#0091DB' },
                     '&:hover': { color: '#0091DB' } }}
             />
@@ -52,7 +52,7 @@ function Navbar({ showControls = true }) {
               <Tab
                 label="Data Products"
                 value="/data-products"
-                sx={{ textTransform: 'none', fontWeight: 500, color: 'rgba(255,255,255,0.8)',
+                sx={{ textTransform: 'none', fontWeight: 600, color: 'rgba(255,255,255,0.8)',
                       '&.Mui-selected': { color: '#0091DB' },
                       '&:hover': { color: '#0091DB' } }}
               />
@@ -61,7 +61,7 @@ function Navbar({ showControls = true }) {
               <Tab
                 label="Ingest"
                 value="/ingest"
-                sx={{ textTransform: 'none', fontWeight: 500, color: 'rgba(255,255,255,0.8)',
+                sx={{ textTransform: 'none', fontWeight: 600, color: 'rgba(255,255,255,0.8)',
                       '&.Mui-selected': { color: '#0091DB' },
                       '&:hover': { color: '#0091DB' } }}
               />
@@ -70,7 +70,7 @@ function Navbar({ showControls = true }) {
               <Tab
                 label="Admin"
                 value="/admin"
-                sx={{ textTransform: 'none', fontWeight: 500, color: 'rgba(255,255,255,0.8)',
+                sx={{ textTransform: 'none', fontWeight: 600, color: 'rgba(255,255,255,0.8)',
                       '&.Mui-selected': { color: '#0091DB' },
                       '&:hover': { color: '#0091DB' } }}
               />
@@ -81,10 +81,9 @@ function Navbar({ showControls = true }) {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
 
             <Button
-              color="inherit"
               onClick={redirectToLogout}
               startIcon={<LogoutIcon />}
-              sx={{ textTransform: 'none', fontWeight: 500, '&:hover': { color: '#0091DB' } }}
+              sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.875rem', letterSpacing: 0, color: 'rgba(255,255,255,0.7)', bgcolor: 'transparent', boxShadow: 'none', '&:hover': { color: '#0091DB', bgcolor: 'transparent', boxShadow: 'none' } }}
             >
               Logout
             </Button>
