@@ -219,15 +219,15 @@ export default function JobStatus({
 
   return (
     <Paper sx={{ p: 2.5, mb: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle1" fontWeight={600}>{algorithmLabel} Job:</Typography>
-          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{parentJobId}</Typography>
-          <Button size="small" onClick={() => copyToClipboard(parentJobId)} sx={{ minWidth: 0, p: 0.5 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', minWidth: 0 }}>
+          <Typography variant="subtitle1" fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>{algorithmLabel} Job:</Typography>
+          <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-all', flex: 1, minWidth: 0 }}>{parentJobId}</Typography>
+          <Button size="small" onClick={() => copyToClipboard(parentJobId)} sx={{ minWidth: 0, p: 0.5, flexShrink: 0 }}>
             <CopyIcon fontSize="small" />
           </Button>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <StatusChip status={derivedStatus} />
           {isPolling && (
             <Button size="small" variant="outlined" color="error" onClick={onStopPolling}>
@@ -280,6 +280,7 @@ export default function JobStatus({
             </Button>
           )}
           {deleted && <Chip label="Deleted" color="error" size="small" />}
+          <Box sx={{ flex: 1 }} />
           <IconButton size="small" onClick={() => { onStopPolling?.(); onClose?.(); }}>
             <CloseIcon fontSize="small" />
           </IconButton>

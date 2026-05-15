@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Paper, Typography, Stack, Divider, IconButton, Collapse,
-  Table, TableBody, TableCell, TableHead, TableRow,
+  Table, TableBody, TableCell, TableHead, TableRow, useMediaQuery, useTheme,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -54,7 +54,11 @@ function GranuleCard({ g, open, onToggle, plotId }) {
       >
         {/* Row 1: granule ID + chevron */}
         <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
-          <Typography variant="caption" sx={{ fontWeight: 600, fontFamily: 'monospace', wordBreak: 'break-word', flex: 1, mr: 0.5 }}>
+          <Typography variant="caption" sx={{
+            fontWeight: 600, fontFamily: 'monospace',
+            wordBreak: 'break-all', overflowWrap: 'anywhere',
+            flex: 1, mr: 0.5, lineHeight: 1.4,
+          }}>
             {g.granule_id}
           </Typography>
           <IconButton size="small" tabIndex={-1} sx={{ flexShrink: 0, mt: -0.5 }}>
@@ -62,7 +66,7 @@ function GranuleCard({ g, open, onToggle, plotId }) {
           </IconButton>
         </Stack>
         {/* Row 2: date · conditions · px */}
-        <Stack direction="row" spacing={1} sx={{ mt: 0.25 }} flexWrap="wrap">
+        <Stack direction="row" spacing={0.5} sx={{ mt: 0.25, flexWrap: 'wrap', gap: 0.25 }}>
           <Typography variant="caption" color="text.secondary">
             {dateStr(g.acquisition_date) ?? '—'}
           </Typography>
@@ -76,19 +80,13 @@ function GranuleCard({ g, open, onToggle, plotId }) {
       </Box>
       <Collapse in={open}>
         <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5, bgcolor: 'white' }}>
-          <Stack direction="row" spacing={2}>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Row label="Campaign" value={g.campaign_name} />
-              <Row label="Sensor"   value={g.sensor_name} />
-              <Row label="Date"     value={dateStr(g.acquisition_date)} />
-              <Row label="Time"     value={g.acquisition_start_time} />
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Row label="Cloud conditions" value={g.cloudy_conditions ?? '—'} alwaysShow />
-              <Row label="Cloud type"     value={present(g.cloud_type)        ? g.cloud_type        : null} />
-              <Row label="Pixels"         value={pixelCount} />
-            </Box>
-          </Stack>
+          <Row label="Campaign" value={g.campaign_name} />
+          <Row label="Sensor"   value={g.sensor_name} />
+          <Row label="Date"     value={dateStr(g.acquisition_date)} />
+          <Row label="Time"     value={g.acquisition_start_time} />
+          <Row label="Cloud conditions" value={g.cloudy_conditions ?? '—'} alwaysShow />
+          <Row label="Cloud type"       value={present(g.cloud_type) ? g.cloud_type : null} />
+          <Row label="Pixels"           value={pixelCount} />
         </Box>
       </Collapse>
     </Box>
@@ -99,6 +97,8 @@ function PlotSidePanel({ plotId, traits, granules, onClose }) {
   const [traitsOpen, setTraitsOpen] = useState(true);
   const [granulesOpen, setGranulesOpen] = useState(true);
   const [openGranuleIdx, setOpenGranuleIdx] = useState(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   useEffect(() => { setOpenGranuleIdx(null); }, [plotId]);
 
@@ -107,23 +107,26 @@ function PlotSidePanel({ plotId, traits, granules, onClose }) {
   const plotName = traits[0]?.plot_name;
 
   return (
-    <Paper elevation={2} sx={{ width: '100%', p: 2 }}>
-      {/* Header — full width */}
+    <Paper elevation={2} sx={{ width: '100%', p: { xs: 1.5, sm: 2 } }}>
+      {/* Header */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-        <Box>
-          <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-            {present(plotName) ? plotName : `Plot ${plotId}`}
-          </Typography>
-        </Box>
+        <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+          {present(plotName) ? plotName : `Plot ${plotId}`}
+        </Typography>
         <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
       </Stack>
 
       <Divider sx={{ mb: 1.5 }} />
 
-      {/* Two-column body */}
-      <Stack direction="row" spacing={1.5} alignItems="flex-start">
-        {/* Left — Trait measurements, slightly narrower */}
-        <Box sx={{ flex: '0 0 55%', minWidth: 0 }}>
+      {/* Body — row on desktop, column on mobile */}
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={1.5}
+        alignItems="flex-start"
+        divider={isMobile ? <Divider flexItem /> : <Divider orientation="vertical" flexItem />}
+      >
+        {/* Trait measurements */}
+        <Box sx={{ flex: '0 0 55%', minWidth: 0, width: { xs: '100%', md: 'auto' } }}>
           <SectionHeader
             title="Trait measurements"
             count={traits.length}
@@ -136,7 +139,8 @@ function PlotSidePanel({ plotId, traits, granules, onClose }) {
                 No trait measurements for this plot.
               </Typography>
             ) : (
-              <Box sx={{ overflowX: 'auto', maxHeight: 320, overflowY: 'auto' }}>                <Table size="small" stickyHeader>
+              <Box sx={{ overflowX: 'auto', maxHeight: 320, overflowY: 'auto' }}>
+                <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
                       {[
@@ -173,10 +177,8 @@ function PlotSidePanel({ plotId, traits, granules, onClose }) {
           </Collapse>
         </Box>
 
-        <Divider orientation="vertical" flexItem />
-
-        {/* Right — Overlapping granules, wider so cards have room */}
-        <Box sx={{ flex: '1 1 0%', minWidth: 280 }}>
+        {/* Overlapping granules */}
+        <Box sx={{ flex: '1 1 0%', minWidth: 0, width: { xs: '100%', md: 'auto' } }}>
           <SectionHeader
             title="Overlapping granules"
             count={granules.length}
@@ -189,7 +191,7 @@ function PlotSidePanel({ plotId, traits, granules, onClose }) {
                 No overlapping granules for this plot.
               </Typography>
             ) : (
-              <Stack spacing={1} sx={{ maxHeight: 400, overflowY: 'auto', pr: 0.5 }}>
+              <Stack spacing={1} sx={{ maxHeight: { xs: 'none', md: 400 }, overflowY: { xs: 'visible', md: 'auto' }, pr: 0.5 }}>
                 {granules.map((g, i) => (
                   <GranuleCard
                     key={i}

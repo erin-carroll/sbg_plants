@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
-  Box, Typography, Button, Stack, Chip, Alert, CircularProgress,
+  Box, Typography, Button, Stack, Chip, Alert, CircularProgress, useTheme, useMediaQuery,
 } from '@mui/material';
 import { Replay as RecheckIcon } from '@mui/icons-material';
 import { ingestApi } from '../utils/api';
@@ -15,6 +15,8 @@ const DEFAULT_FILE_SLOTS = [
 ];
 
 export default function ResubmitPanel({ batchId, fileSlots, failingFiles, onReplaced, onRecheck }) {
+  const theme   = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [replacements, setReplacements] = useState({});
   const [replacing, setReplacing]       = useState({});
   const [replaceErrors, setReplaceErrors] = useState({});
@@ -68,10 +70,10 @@ export default function ResubmitPanel({ batchId, fileSlots, failingFiles, onRepl
           const hasFail = failingFiles.has(slot);
           return (
             <Box key={slot}>
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction={isMobile ? 'column' : 'row'} spacing={1} alignItems={isMobile ? 'flex-start' : 'center'}>
                 <Typography
                   variant="body2"
-                  sx={{ minWidth: 160, fontWeight: hasFail ? 600 : 400, color: hasFail ? 'error.main' : 'text.secondary' }}
+                  sx={{ minWidth: isMobile ? 'unset' : 160, fontWeight: hasFail ? 600 : 400, color: hasFail ? 'error.main' : 'text.secondary' }}
                 >
                   {slotDef.label}{hasFail && ' *'}
                 </Typography>
@@ -80,14 +82,14 @@ export default function ResubmitPanel({ batchId, fileSlots, failingFiles, onRepl
                   type="file"
                   accept={slotDef.accept}
                   onChange={e => handleFileChange(slot, e)}
-                  style={{ flex: 1 }}
+                  style={{ flex: isMobile ? 'unset' : 1, width: isMobile ? '100%' : undefined }}
                 />
                 <Button
                   size="small"
                   variant="outlined"
                   onClick={() => handleReplace(slot)}
                   disabled={!replacements[slot] || replacing[slot]}
-                  sx={{ textTransform: 'none', minWidth: 80 }}
+                  sx={{ textTransform: 'none', minWidth: 80, alignSelf: isMobile ? 'flex-start' : 'auto' }}
                 >
                   {replacing[slot] ? <CircularProgress size={14} /> : 'Upload'}
                 </Button>

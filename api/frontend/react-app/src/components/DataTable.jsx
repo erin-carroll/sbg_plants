@@ -35,7 +35,7 @@ function DataTable({ columns, data, summarizeValue, defaultCollapsed = false }) 
         </Stack>
       </Box>
       <Collapse in={!collapsed}>
-        <TableContainer sx={{ maxHeight: 600 }}>
+        <TableContainer sx={{ maxHeight: 600, overflowX: 'auto' }}>
           <Table stickyHeader>
             <TableHead>
               <TableRow>

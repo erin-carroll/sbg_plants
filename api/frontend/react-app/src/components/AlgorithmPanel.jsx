@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Box, Paper, Stack, Typography, Button, CircularProgress,
   FormControl, InputLabel, Select, MenuItem, Tooltip,
+  useMediaQuery, useTheme,
 } from '@mui/material';
 import { PlayArrow as RunIcon } from '@mui/icons-material';
 import JobStatus from './JobStatus';
@@ -9,10 +10,6 @@ import { ALGORITHM_REGISTRY } from '../config/algorithmConfig';
 
 const ALGORITHM_OPTIONS = Object.entries(ALGORITHM_REGISTRY).map(([key, cfg]) => ({ key, ...cfg }));
 
-/**
- * AlgorithmPanel — algorithm selector, Run button, and active job status monitor.
- * Sits above JobHistory on DataProductsPage.
- */
 export default function AlgorithmPanel({
   selectedAlgorithmKey,
   onAlgorithmChange,
@@ -21,15 +18,18 @@ export default function AlgorithmPanel({
   runDisabled,
   totalPixelCount,
 }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Paper sx={{ p: 2 }}>
-        <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mr: 1 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'stretch', sm: 'center' }} spacing={1.5} flexWrap="wrap">
+          <Typography variant="subtitle2" fontWeight={600}>
             Run Algorithm
           </Typography>
 
-          <FormControl size="small" sx={{ minWidth: 160 }}>
+          <FormControl size="small" sx={{ minWidth: 160, width: { xs: '100%', sm: 'auto' } }}>
             <InputLabel sx={{ fontSize: 13 }}>Algorithm</InputLabel>
             <Select
               value={selectedAlgorithmKey}
@@ -57,8 +57,11 @@ export default function AlgorithmPanel({
               job.handleRun();
             }}
             disabled={runDisabled || job.isPolling}
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
           >
-            Run {algorithm.label}{totalPixelCount ? ` (${totalPixelCount.toLocaleString()} px)` : ''}
+            {isMobile
+              ? `Run ${algorithm.label}`
+              : `Run ${algorithm.label}${totalPixelCount ? ` (${totalPixelCount.toLocaleString()} px)` : ''}`}
           </Button>
 
           {algorithm.description && (

@@ -124,7 +124,7 @@ export default function JobHistory({ selectedAlgorithmKey, activeJobId, onMonito
 
   return (
     <Paper sx={{ p: 2 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: open ? 1.5 : 0 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{ mb: open ? 1.5 : 0 }}>
         <Stack
           direction="row"
           spacing={1}

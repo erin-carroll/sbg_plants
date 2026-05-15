@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   Box, Stack, Button, CircularProgress, Alert,
   Typography, Divider, Paper, ToggleButtonGroup, ToggleButton,
-  Tooltip, IconButton,
+  Tooltip, IconButton, Drawer, useMediaQuery, useTheme,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -30,10 +30,12 @@ import { useSpectraExtraction } from '../hooks/useSpectraExtraction';
 function LinkedQueryPage() {
   const q = useLinkedQuery();
   const clearDrawnRef = useRef(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [filterCollapsed, setFilterCollapsed] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [extractDisabled, setExtractDisabled] = useState(false);
-
   const [downloadLoading, setDownloadLoading] = useState(false);
 
   const spectra = useSpectraExtraction(
@@ -81,103 +83,122 @@ function LinkedQueryPage() {
   const hasResults = q.totalPlots > 0 || q.traits.length > 0 || q.granules.length > 0;
   const hasPrev    = q.offset > 0;
   const hasNext    = q.totalPlots > q.offset + q.limit;
-  const showPaging = q.totalPlots > 0 && (hasPrev || hasNext);
+
+  const filterContent = (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, px: 2, pb: 2, pt: isMobile ? 2 : 0, flex: 1, overflowY: 'auto' }}>
+      <StagingToggle onToggle={() => { q.handleReset(); spectra.reset(); setExtractDisabled(false); clearDrawnRef?.current?.(); }} />
+      <LinkedFilterPanel
+        campaignName={q.campaignName}
+        setCampaignName={q.setCampaignName}
+        traitFilters={q.traitFilters}
+        setTraitFilters={q.setTraitFilters}
+        granuleFilters={q.granuleFilters}
+        setGranuleFilters={q.setGranuleFilters}
+        geojsonContent={q.geojsonContent}
+        setGeojsonContent={q.setUploadedGeojson}
+        clearDrawnRef={clearDrawnRef}
+      />
+      <Divider />
+      <Button
+        variant="contained"
+        startIcon={q.loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
+        onClick={() => { q.handleApply(); if (isMobile) setMobileFilterOpen(false); }}
+        disabled={q.loading}
+        fullWidth
+      >
+        Apply
+      </Button>
+      <Button
+        variant="contained"
+        color="secondary"
+        startIcon={<ResetIcon />}
+        onClick={() => { q.handleReset(); spectra.reset(); setExtractDisabled(false); clearDrawnRef?.current?.(); }}
+        disabled={q.loading}
+        fullWidth
+      >
+        Reset
+      </Button>
+      {hasResults && (
+        <Typography variant="body2" color="text.secondary">
+          {q.totalPlots} plots matched
+        </Typography>
+      )}
+    </Box>
+  );
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <Navbar />
 
-      {/* Two-column body — fills remaining height, each column scrolls independently */}
       <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', mt: '56px', maxWidth: { xl: 1920 }, mx: 'auto', width: '100%' }}>
 
-        {/* Left — filter panel, collapsible */}
-        <Box
-          sx={{
-            width: filterCollapsed ? 48 : { md: 300, lg: 380, xl: 420 },
-            flexShrink: 0,
-            borderRight: 1,
-            borderColor: 'divider',
-            overflowY: filterCollapsed ? 'hidden' : 'auto',
-            overflowX: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            transition: 'width 0.2s ease',
-          }}
-        >
-          {/* Collapse toggle — always visible */}
-          <Box sx={{ display: 'flex', justifyContent: filterCollapsed ? 'center' : 'flex-end', p: 0.5, flexShrink: 0 }}>
-            <Tooltip title={filterCollapsed ? 'Expand filters' : 'Collapse filters'} placement="right">
-              <IconButton size="small" onClick={() => setFilterCollapsed(v => !v)}>
-                {filterCollapsed ? <ExpandIcon /> : <CollapseIcon />}
-              </IconButton>
-            </Tooltip>
-          </Box>
+        {/* Mobile — filter drawer */}
+        {isMobile && (
+          <Drawer
+            anchor="left"
+            open={mobileFilterOpen}
+            onClose={() => setMobileFilterOpen(false)}
+            PaperProps={{ sx: { width: 300, mt: '56px', height: 'calc(100% - 56px)' } }}
+          >
+            {filterContent}
+          </Drawer>
+        )}
 
-          {/* Filter content — hidden when collapsed */}
-          <Box sx={{ display: filterCollapsed ? 'none' : 'flex', flexDirection: 'column', gap: 2, px: 2, pb: 2, flex: 1, overflowY: 'auto' }}>
-            <StagingToggle onToggle={() => { q.handleReset(); spectra.reset(); setExtractDisabled(false); clearDrawnRef?.current?.(); }} />
-
-            <LinkedFilterPanel
-              campaignName={q.campaignName}
-              setCampaignName={q.setCampaignName}
-              traitFilters={q.traitFilters}
-              setTraitFilters={q.setTraitFilters}
-              granuleFilters={q.granuleFilters}
-              setGranuleFilters={q.setGranuleFilters}
-              geojsonContent={q.geojsonContent}
-              setGeojsonContent={q.setUploadedGeojson}
-              clearDrawnRef={clearDrawnRef}
-            />
-
-            <Divider />
-
-            <Button
-              variant="contained"
-              startIcon={q.loading ? <CircularProgress size={16} color="inherit" /> : <SearchIcon />}
-              onClick={q.handleApply}
-              disabled={q.loading}
-              fullWidth
-            >
-              Apply
-            </Button>
-
-            <Button
-              variant="contained"
-              color="secondary"
-              startIcon={<ResetIcon />}
-              onClick={() => { q.handleReset(); spectra.reset(); setExtractDisabled(false); clearDrawnRef?.current?.(); }}
-              disabled={q.loading}
-              fullWidth
-            >
-              Reset
-            </Button>
-
-            {hasResults && (
-              <Typography variant="body2" color="text.secondary">
-                {q.totalPlots} plots matched
-              </Typography>
+        {/* Desktop — filter side panel */}
+        {!isMobile && (
+          <Box
+            sx={{
+              width: filterCollapsed ? 48 : { md: 300, lg: 380, xl: 420 },
+              flexShrink: 0,
+              borderRight: 1,
+              borderColor: 'divider',
+              overflowY: filterCollapsed ? 'hidden' : 'auto',
+              overflowX: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              transition: 'width 0.2s ease',
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: filterCollapsed ? 'center' : 'flex-end', p: 0.5, flexShrink: 0 }}>
+              <Tooltip title={filterCollapsed ? 'Expand filters' : 'Collapse filters'} placement="right">
+                <IconButton size="small" onClick={() => setFilterCollapsed(v => !v)}>
+                  {filterCollapsed ? <ExpandIcon /> : <CollapseIcon />}
+                </IconButton>
+              </Tooltip>
+            </Box>
+            {!filterCollapsed && filterContent}
+            {filterCollapsed && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, pt: 1 }}>
+                <Tooltip title="Filters" placement="right">
+                  <FilterIcon fontSize="small" color="action" />
+                </Tooltip>
+                {hasResults && (
+                  <Tooltip title={`${q.totalPlots} plots matched`} placement="right">
+                    <Typography variant="caption" color="primary" sx={{ writingMode: 'vertical-rl', fontSize: 10 }}>
+                      {q.totalPlots}
+                    </Typography>
+                  </Tooltip>
+                )}
+              </Box>
             )}
           </Box>
+        )}
 
-          {/* Collapsed state — show filter icon as hint */}
-          {filterCollapsed && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, pt: 1 }}>
-              <Tooltip title="Filters" placement="right">
-                <FilterIcon fontSize="small" color="action" />
-              </Tooltip>
-              {hasResults && (
-                <Tooltip title={`${q.totalPlots} plots matched`} placement="right">
-                  <Typography variant="caption" color="primary" sx={{ writingMode: 'vertical-rl', fontSize: 10 }}>
-                    {q.totalPlots}
-                  </Typography>
-                </Tooltip>
-              )}
-            </Box>
+        {/* Right — map + table */}
+        <Box sx={{ flex: 1, overflowY: 'auto', p: { xs: 1, sm: 2 }, display: 'flex', flexDirection: 'column', gap: 2, position: 'relative', minWidth: 0 }}>
+
+          {/* Mobile filter toggle button */}
+          {isMobile && (
+            <Button
+              variant="outlined"
+              startIcon={<FilterIcon />}
+              onClick={() => setMobileFilterOpen(true)}
+              size="small"
+              sx={{ alignSelf: 'flex-start' }}
+            >
+              Filters{hasResults ? ` · ${q.totalPlots} plots` : ''}
+            </Button>
           )}
-        </Box>
-
-        {/* Right — map + table, scrollable. position:relative so side panel can overlay */}
-        <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2, position: 'relative' }}>
 
           {q.error && (
             <Alert severity="error" onClose={() => q.setError(null)}>{q.error}</Alert>
@@ -201,9 +222,7 @@ function LinkedQueryPage() {
             <Alert severity="info">No plots matched your filters.</Alert>
           )}
 
-          {/* Main content */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {/* Plot detail panel — shown above map when a plot is selected */}
             {q.selectedPlotId && (
               <PlotSidePanel
                 plotId={q.selectedPlotId}
@@ -224,19 +243,17 @@ function LinkedQueryPage() {
                 onShapeDrawn={q.setDrawnGeojson}
                 clearDrawnRef={clearDrawnRef}
                 drawnShape={q.geojsonContent && q.geojsonIsDrawn ? q.geojsonContent : null}
-                height={420}
+                height={isMobile ? 280 : 420}
               />
 
-              {/* Action bar — between map and table */}
               {hasResults && (
-                <Paper elevation={1} sx={{ px: 2, py: 1.5 }}>
-                  {/* Row 1 — pagination */}
+                <Paper elevation={1} sx={{ px: { xs: 1, sm: 2 }, py: 1.5 }}>
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                     <Button size="small" variant="outlined" startIcon={<PrevIcon />}
                       onClick={q.handlePrev} disabled={!hasPrev || q.loading}>
                       Prev
                     </Button>
-                    <Typography variant="body2" color="text.secondary" sx={{ flex: 1, textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ flex: 1, textAlign: 'center', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                       {q.displayedOffset + 1}–{Math.min(q.displayedOffset + q.limit, q.totalPlots)} of {q.totalPlots} plots
                     </Typography>
                     <Button size="small" variant="outlined" endIcon={<NextIcon />}
@@ -244,10 +261,9 @@ function LinkedQueryPage() {
                       Next
                     </Button>
                   </Stack>
-                  {/* Row 2 — pixel count + actions */}
-                  <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                  <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
                     {q.hasQueried && (
-                      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', mr: 1 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                         {q.pagePixelCount.toLocaleString()} px (page) /{' '}
                         {q.pixelCountLoading ? '…' : (q.totalPixelCount ?? 0).toLocaleString()} px (total)
                       </Typography>
@@ -265,17 +281,16 @@ function LinkedQueryPage() {
                     <Button variant="contained" size="small" color="secondary" startIcon={<SpectraIcon />}
                       onClick={spectra.handleExtractSpectra}
                       disabled={extractDisabled || spectra.isPolling || !q.hasQueried}>
-                      Extract Spectra{q.totalPixelCount ? ` (${q.totalPixelCount.toLocaleString()} px)` : ''}
+                      {isMobile ? 'Extract' : `Extract Spectra${q.totalPixelCount ? ` (${q.totalPixelCount.toLocaleString()} px)` : ''}`}
                     </Button>
                     <Button variant="contained" size="small" startIcon={downloadLoading ? <CircularProgress size={14} color="inherit" /> : <DownloadIcon />}
                       onClick={handleDownloadCSV} disabled={downloadLoading || !q.hasQueried}>
-                      Download CSV{q.totalCsvRows != null ? ` (${q.totalCsvRows.toLocaleString()} rows)` : q.hasQueried ? ' (…)' : ''}
+                      {isMobile ? 'CSV' : `Download CSV${q.totalCsvRows != null ? ` (${q.totalCsvRows.toLocaleString()} rows)` : q.hasQueried ? ' (…)' : ''}`}
                     </Button>
                   </Stack>
                 </Paper>
               )}
 
-              {/* Job status — above table */}
               <SpectraJobStatus
                 jobsBySensor={spectra.jobsBySensor ?? {}}
                 sensorStatuses={spectra.sensorStatuses ?? {}}

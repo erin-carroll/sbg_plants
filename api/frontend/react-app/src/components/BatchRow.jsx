@@ -93,14 +93,6 @@ export default function BatchRow({ batch, fileSlots, onApprove, onReject, onBatc
         <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
           {batch.batch_id.slice(0, 8)}…
         </TableCell>
-        <TableCell>{batch.uploaded_by}</TableCell>
-        <TableCell>{new Date(batch.uploaded_at).toLocaleString()}</TableCell>
-        <TableCell>
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <Chip label={chip.label} color={chip.color} size="small" />
-            {isActive && <CircularProgress size={14} thickness={5} />}
-          </Stack>
-        </TableCell>
         <TableCell>
           <Stack direction="row" spacing={0.5}>
             {isFail && (
@@ -149,11 +141,19 @@ export default function BatchRow({ batch, fileSlots, onApprove, onReject, onBatc
             )}
           </Stack>
         </TableCell>
+        <TableCell>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Chip label={chip.label} color={chip.color} size="small" />
+            {isActive && <CircularProgress size={14} thickness={5} />}
+          </Stack>
+        </TableCell>
+        <TableCell>{batch.uploaded_by}</TableCell>
+        <TableCell>{new Date(batch.uploaded_at).toLocaleString()}</TableCell>
       </TableRow>
 
       {/* Expandable QAQC report + resubmit panel */}
       <TableRow>
-        <TableCell colSpan={5} sx={{ p: 0, borderBottom: expanded ? undefined : 'none' }}>
+        <TableCell colSpan={5} sx={{ p: 0, borderBottom: expanded ? undefined : 'none', minWidth: { xs: 320, sm: 'unset' } }}>
           <Collapse in={expanded} unmountOnExit>
             <Box sx={{ bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'divider' }}>
               <Typography variant="caption" color="text.secondary" sx={{ px: 2, pt: 1.5, display: 'block' }}>

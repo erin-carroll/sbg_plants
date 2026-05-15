@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Paper, Typography, Box, Stack, Chip, IconButton, Collapse, Tooltip } from '@mui/material';
-import { Map as MapIcon, ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon, CenterFocusStrong as RecenterIcon } from '@mui/icons-material';
-import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
+import { Map as MapIcon, ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon } from '@mui/icons-material';
+import { MapContainer, TileLayer, GeoJSON, useMap, ScaleControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw';
@@ -13,6 +13,31 @@ if (typeof window !== 'undefined' && !window.type) {
   window.type = '';
 }
 
+// Custom recenter button rendered as a Leaflet top-right control
+function RecenterControl({ onRecenter }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const control = L.control({ position: 'topleft' });
+    control.onAdd = () => {
+      const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      const btn = L.DomUtil.create('a', '', container);
+      btn.href = '#';
+      btn.title = 'Recenter map';
+      btn.role = 'button';
+      btn.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:bold;text-decoration:none;color:#444;line-height:1;';
+      btn.innerHTML = '⌖';
+      btn.onmouseover = () => { btn.style.background = '#CE9E4A'; };
+      btn.onmouseout  = () => { btn.style.background = '#fff'; };
+      L.DomEvent.on(btn, 'click', (e) => { L.DomEvent.preventDefault(e); L.DomEvent.stopPropagation(e); onRecenter(); });
+      return container;
+    };
+    control.addTo(map);
+    return () => control.remove();
+  }, [map, onRecenter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return null;
+}
 // Fits the map to the bounds of the current GeoJSON data whenever it changes.
 // Falls back to setView(center, zoom) when there's no data to fit.
 function MapUpdater({ mapData, center, zoom, recenterTrigger }) {
@@ -243,78 +268,78 @@ function MapView({
 
   return (
     <Paper elevation={2} sx={{ mb: 3, overflow: 'hidden' }}>
-      <Box sx={{ bgcolor: 'grey.100', p: 2, borderBottom: collapsed ? 'none' : '1px solid', borderColor: 'divider' }}>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <MapIcon color="primary" />
-          <Typography variant="h6">Map View</Typography>
+      <Box sx={{ bgcolor: 'grey.100', p: { xs: 1, sm: 2 }, borderBottom: collapsed ? 'none' : '1px solid', borderColor: 'divider' }}>
+        {/* Row 1 — title + collapse */}
+        <Stack direction="row" spacing={1} alignItems="center">
+          <MapIcon color="primary" fontSize="small" />
+          <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>Map View</Typography>
           {mapData && !collapsed && (
             <Typography variant="caption" color="text.secondary">
               {mapData.features?.length || 0} features
             </Typography>
           )}
           <Box sx={{ flex: 1 }} />
-          {!collapsed && (
-            <Tooltip title="Recenter map">
-              <IconButton size="small" onClick={() => setRecenterTrigger(v => v + 1)} sx={{ '&:hover': { bgcolor: '#CE9E4A', color: '#ffffff' } }}>
-                <RecenterIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-          {!collapsed && drawnShape && (
-            <Chip
-              label="Drawn area"
-              size="small"
-              onClick={handleToggleDrawn}
-              sx={{
-                bgcolor:    showDrawn ? 'success.main' : 'transparent',
-                color:      showDrawn ? 'success.contrastText' : 'success.main',
-                border:     '1px solid',
-                borderColor: 'success.main',
-                cursor:     'pointer',
-                fontWeight: 500,
-                '&:hover': { bgcolor: '#36633A', borderColor: '#36633A', color: '#ffffff' },
-              }}
-            />
-          )}
-          {!collapsed && filterData && (
-            <Chip
-              label="Filter boundary"
-              size="small"
-              onClick={() => setShowFilter(v => !v)}
-              sx={{
-                bgcolor:    showFilter ? '#0D3E70' : 'transparent',
-                color:      showFilter ? '#ffffff' : '#0D3E70',
-                border:     '1px solid',
-                borderColor: '#0D3E70',
-                cursor:     'pointer',
-                fontWeight: 500,
-                '&:hover': { bgcolor: '#1A2A42', borderColor: '#1A2A42', color: '#ffffff' },
-              }}
-            />
-          )}
-          {!collapsed && mapData && (
-            <Chip
-              label="Query results"
-              size="small"
-              onClick={() => setShowResults(v => !v)}
-              sx={{
-                bgcolor:    showResults ? 'secondary.main' : 'transparent',
-                color:      showResults ? 'secondary.contrastText' : 'secondary.main',
-                border:     '1px solid',
-                borderColor: 'secondary.main',
-                cursor:     'pointer',
-                fontWeight: 500,
-                '&:hover': { bgcolor: '#087099', borderColor: '#087099', color: '#ffffff' },
-              }}
-            />
-          )}
           <IconButton size="small" onClick={() => setCollapsed(v => !v)}>
             {collapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}
           </IconButton>
         </Stack>
+
+        {/* Row 2 — layer controls, only when expanded */}
+        {!collapsed && (
+          <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" sx={{ mt: 1, gap: 0.5 }}>
+            {drawnShape && (
+              <Chip
+                label="Drawn area"
+                size="small"
+                onClick={handleToggleDrawn}
+                sx={{
+                  bgcolor:    showDrawn ? 'success.main' : 'transparent',
+                  color:      showDrawn ? 'success.contrastText' : 'success.main',
+                  border:     '1px solid',
+                  borderColor: 'success.main',
+                  cursor:     'pointer',
+                  fontWeight: 500,
+                  '&:hover': { bgcolor: '#36633A', borderColor: '#36633A', color: '#ffffff' },
+                }}
+              />
+            )}
+            {filterData && (
+              <Chip
+                label="Filter boundary"
+                size="small"
+                onClick={() => setShowFilter(v => !v)}
+                sx={{
+                  bgcolor:    showFilter ? '#0D3E70' : 'transparent',
+                  color:      showFilter ? '#ffffff' : '#0D3E70',
+                  border:     '1px solid',
+                  borderColor: '#0D3E70',
+                  cursor:     'pointer',
+                  fontWeight: 500,
+                  '&:hover': { bgcolor: '#1A2A42', borderColor: '#1A2A42', color: '#ffffff' },
+                }}
+              />
+            )}
+            {mapData && (
+              <Chip
+                label="Query results"
+                size="small"
+                onClick={() => setShowResults(v => !v)}
+                sx={{
+                  bgcolor:    showResults ? 'secondary.main' : 'transparent',
+                  color:      showResults ? 'secondary.contrastText' : 'secondary.main',
+                  border:     '1px solid',
+                  borderColor: 'secondary.main',
+                  cursor:     'pointer',
+                  fontWeight: 500,
+                  '&:hover': { bgcolor: '#087099', borderColor: '#087099', color: '#ffffff' },
+                }}
+              />
+            )}
+          </Stack>
+        )}
       </Box>
       <Collapse in={!collapsed}>
-        <Box sx={{ height }}>
+        <Box sx={{ height, position: 'relative' }}>
           <MapContainer
             center={center}
             zoom={zoom}
@@ -324,6 +349,8 @@ function MapView({
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             />
+            <ScaleControl position="bottomleft" imperial={false} />
+            <RecenterControl onRecenter={() => setRecenterTrigger(v => v + 1)} />
             <MapUpdater mapData={mapData ?? filterData} center={center} zoom={zoom} recenterTrigger={recenterTrigger} />
 
             {onShapeDrawn && <DrawControl onShapeDrawn={onShapeDrawn} clearRef={clearDrawnRef} showRef={showDrawnRef} />}
@@ -343,6 +370,16 @@ function MapView({
               />
             )}
           </MapContainer>
+          {/* CRS badge — top right */}
+          <Box sx={{
+            position: 'absolute', top: 8, right: 8, zIndex: 1000,
+            bgcolor: 'rgba(255,255,255,0.5)', borderRadius: 1,
+            px: 0.25, py: 0, pointerEvents: 'none',
+          }}>
+            <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', fontFamily: 'monospace' }}>
+              EPSG:4326
+            </Typography>
+          </Box>
         </Box>
       </Collapse>
     </Paper>
