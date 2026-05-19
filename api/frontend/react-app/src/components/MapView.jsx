@@ -25,8 +25,8 @@ function RecenterControl({ onRecenter }) {
       btn.href = '#';
       btn.title = 'Recenter map';
       btn.role = 'button';
-      btn.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:bold;text-decoration:none;color:#444;line-height:1;';
-      btn.innerHTML = '⌖';
+      btn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:30px;height:30px;text-decoration:none;color:#444;padding:0;box-sizing:border-box;';
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>';
       btn.onmouseover = () => { btn.style.background = '#CE9E4A'; };
       btn.onmouseout  = () => { btn.style.background = '#fff'; };
       L.DomEvent.on(btn, 'click', (e) => { L.DomEvent.preventDefault(e); L.DomEvent.stopPropagation(e); onRecenter(); });
@@ -267,8 +267,8 @@ function MapView({
   };
 
   return (
-    <Paper elevation={2} sx={{ mb: 3, overflow: 'hidden' }}>
-      <Box sx={{ bgcolor: 'grey.100', p: { xs: 1, sm: 2 }, borderBottom: collapsed ? 'none' : '1px solid', borderColor: 'divider' }}>
+    <Paper elevation={2} sx={{ mb: 3, overflow: 'visible', borderRadius: 1 }}>
+      <Box sx={{ bgcolor: 'grey.100', p: { xs: 1, sm: 2 }, borderBottom: collapsed ? 'none' : '1px solid', borderColor: 'divider', position: 'relative', zIndex: 1, borderRadius: '4px 4px 0 0' }}>
         {/* Row 1 — title + collapse */}
         <Stack direction="row" spacing={1} alignItems="center">
           <MapIcon color="primary" fontSize="small" />
@@ -344,12 +344,12 @@ function MapView({
             center={center}
             zoom={zoom}
             style={{ height: '100%', width: '100%' }}
+            attributionControl={false}
           >
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             />
-            <ScaleControl position="bottomleft" imperial={false} />
+            <ScaleControl position="bottomright" imperial={false} />
             <RecenterControl onRecenter={() => setRecenterTrigger(v => v + 1)} />
             <MapUpdater mapData={mapData ?? filterData} center={center} zoom={zoom} recenterTrigger={recenterTrigger} />
 

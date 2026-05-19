@@ -28,6 +28,11 @@
   --color-overlay:           rgba(255, 255, 255, 0.8);
 }
 
+/* Hide Leaflet attribution control (logo + text) */
+.leaflet-control-attribution {
+  display: none !important;
+}
+
 /* Leaflet zoom controls */
 .leaflet-control-zoom a {
   transition: background-color 0.2s, color 0.2s;

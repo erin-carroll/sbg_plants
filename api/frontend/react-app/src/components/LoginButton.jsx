@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Typography, Button, AppBar, Toolbar } from "@mui/material";
 import { Login as LoginIcon } from "@mui/icons-material";
 import { redirectToLogin } from "../utils/auth";
+import aiLogo from '../../public/ai_logo_terracotta_plane.png';
 
 export default function LoginButton() {
   return (
@@ -9,7 +10,9 @@ export default function LoginButton() {
       {/* Same navbar as the app, but no controls */}
       <AppBar position="fixed" elevation={2}>
         <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', minHeight: 56 }}>
-          <Typography variant="h6" sx={{
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box component="img" src={aiLogo} alt="AI Logo" sx={{ height: 52, width: 'auto' }} />
+            <Typography variant="h6" sx={{
             fontWeight: 700, whiteSpace: 'nowrap', fontSize: '1.5rem',
             background: 'linear-gradient(90deg, #37598C, #0091DB, #3E8450, #E8CC56, #DB9D3A, #C16B49)',
             WebkitBackgroundClip: 'text',
@@ -18,6 +21,7 @@ export default function LoginButton() {
           }}>
             VSWIR Plants
           </Typography>
+          </Box>
         </Toolbar>
       </AppBar>
 
@@ -48,20 +52,8 @@ export default function LoginButton() {
           }}
         >
           {/* Icon */}
-          <Box
-            sx={{
-              width: 56,
-              height: 56,
-              borderRadius: '50%',
-              backgroundColor: 'primary.light',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mx: 'auto',
-              mb: 2,
-            }}
-          >
-            <LoginIcon sx={{ color: 'primary.contrastText', fontSize: 28 }} />
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+            <Box component="img" src={aiLogo} alt="AI Logo" sx={{ height: 80, width: 'auto' }} />
           </Box>
 
           <Typography variant="h5" sx={{

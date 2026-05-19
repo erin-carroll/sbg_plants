@@ -23,6 +23,7 @@ import PlotSidePanel from '../components/PlotSidePanel';
 import LinkedDataTable from '../components/LinkedDataTable';
 import SpectraJobStatus from '../components/SpectraJobStatus';
 import StagingToggle from '../components/StagingToggle';
+import SpectraControls from '../components/SpectraControls';
 
 import { useLinkedQuery } from '../hooks/useLinkedQuery';
 import { useSpectraExtraction } from '../hooks/useSpectraExtraction';
@@ -247,48 +248,16 @@ function LinkedQueryPage() {
               />
 
               {hasResults && (
-                <Paper elevation={1} sx={{ px: { xs: 1, sm: 2 }, py: 1.5 }}>
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                    <Button size="small" variant="outlined" startIcon={<PrevIcon />}
-                      onClick={q.handlePrev} disabled={!hasPrev || q.loading}>
-                      Prev
-                    </Button>
-                    <Typography variant="body2" color="text.secondary" sx={{ flex: 1, textAlign: 'center', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                      {q.displayedOffset + 1}–{Math.min(q.displayedOffset + q.limit, q.totalPlots)} of {q.totalPlots} plots
-                    </Typography>
-                    <Button size="small" variant="outlined" endIcon={<NextIcon />}
-                      onClick={q.handleNext} disabled={!hasNext || q.loading}>
-                      Next
-                    </Button>
-                  </Stack>
-                  <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
-                    {q.hasQueried && (
-                      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                        {q.pagePixelCount.toLocaleString()} px (page) /{' '}
-                        {q.pixelCountLoading ? '…' : (q.totalPixelCount ?? 0).toLocaleString()} px (total)
-                      </Typography>
-                    )}
-                    <Box sx={{ flex: 1 }} />
-                    <ToggleButtonGroup
-                      value={spectra.spectraType}
-                      exclusive
-                      onChange={(_, v) => { if (v) spectra.setSpectraType(v); }}
-                      size="small"
-                    >
-                      <ToggleButton value="radiance"    sx={{ textTransform: 'none', fontSize: 12 }}>Radiance</ToggleButton>
-                      <ToggleButton value="reflectance" sx={{ textTransform: 'none', fontSize: 12 }}>Reflectance</ToggleButton>
-                    </ToggleButtonGroup>
-                    <Button variant="contained" size="small" color="secondary" startIcon={<SpectraIcon />}
-                      onClick={spectra.handleExtractSpectra}
-                      disabled={extractDisabled || spectra.isPolling || !q.hasQueried}>
-                      {isMobile ? 'Extract' : `Extract Spectra${q.totalPixelCount ? ` (${q.totalPixelCount.toLocaleString()} px)` : ''}`}
-                    </Button>
-                    <Button variant="contained" size="small" startIcon={downloadLoading ? <CircularProgress size={14} color="inherit" /> : <DownloadIcon />}
-                      onClick={handleDownloadCSV} disabled={downloadLoading || !q.hasQueried}>
-                      {isMobile ? 'CSV' : `Download CSV${q.totalCsvRows != null ? ` (${q.totalCsvRows.toLocaleString()} rows)` : q.hasQueried ? ' (…)' : ''}`}
-                    </Button>
-                  </Stack>
-                </Paper>
+                <SpectraControls
+                  q={q}
+                  spectra={spectra}
+                  hasPrev={hasPrev}
+                  hasNext={hasNext}
+                  extractDisabled={extractDisabled}
+                  downloadLoading={downloadLoading}
+                  onDownloadCSV={handleDownloadCSV}
+                  isMobile={isMobile}
+                />
               )}
 
               <SpectraJobStatus

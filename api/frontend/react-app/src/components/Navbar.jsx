@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import aiLogo from '../../public/ai_logo_terracotta_plane.png';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar, Toolbar, Typography,
@@ -57,6 +58,7 @@ function Navbar({ showControls = true }) {
                 <MenuIcon />
               </IconButton>
             )}
+            <Box component="img" src={aiLogo} alt="AI Logo" sx={{ height: 52, width: 'auto' }} />
             {titleTypography}
           </Box>
 
