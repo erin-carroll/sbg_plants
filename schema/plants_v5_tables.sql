@@ -100,6 +100,7 @@ CREATE TABLE vswir_plants.plot_raster_intersect (
 
 -- not all data might have the glt row and column??
 -- how do we want to store coords here? should we use do a geometry column to enforce crs?
+-- add cloud mask?
 CREATE TABLE vswir_plants.pixel (
     pixel_id SERIAL PRIMARY KEY,
     plot_id INTEGER NOT NULL,
@@ -107,6 +108,7 @@ CREATE TABLE vswir_plants.pixel (
     glt_row INTEGER NOT NULL,
     glt_column INTEGER NOT NULL,
     shade_mask BOOLEAN NOT NULL,
+    -- cloud_mask BOOLEAN NOT NULL,
     path_length FLOAT4 NOT NULL,
     to_sensor_azimuth FLOAT4 NOT NULL,
     to_sensor_zenith FLOAT4 NOT NULL,

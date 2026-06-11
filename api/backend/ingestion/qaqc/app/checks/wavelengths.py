@@ -7,15 +7,13 @@ Checks (in order):
                   Driven by checks/config/wavelengths.json.
   2. FK — each (campaign_name, sensor_name) must resolve to this bundle
           or the production database.
-  3. No existing (campaign_name, sensor_name) — must not already exist in
-                                                 production sensor_campaign.
-  4. Band contiguity — per sensor, band values must be 0-based contiguous
+  3. Band contiguity — per sensor, band values must be 0-based contiguous
                        integers (0, 1, 2, … N-1).
-  5. Wavelength monotonicity — per sensor, wavelength must increase
+  4. Wavelength monotonicity — per sensor, wavelength must increase
                                 strictly with band index.
-  6. Wavelength range — all wavelength values must fall within the plausible
+  5. Wavelength range — all wavelength values must fall within the plausible
                         VSWIR range (350–2600 nm).
-  7. FWHM range — all fwhm values must be within 0.1–100 nm.
+  6. FWHM range — all fwhm values must be within 0.1–100 nm.
 """
 
 from __future__ import annotations
@@ -44,7 +42,6 @@ def check(context: CheckContext) -> CheckResult:
     df     = context.data["wavelengths"]
     errors, warnings = run_mechanical_checks(df, context.enums, CONFIG)
     errors += _check_campaign_sensor_fk(df, context)
-    errors += _check_no_existing_sensor_campaigns(df, context)
     errors += _check_band_contiguity(df)
     errors += _check_wavelength_monotonicity(df)
     errors += _check_wavelength_range(df)
@@ -69,23 +66,6 @@ def _check_campaign_sensor_fk(df: pd.DataFrame, context: CheckContext) -> list[d
                     f"(campaign_name='{camp}', sensor_name='{sens}') "
                     f"not found in campaign_metadata or database"
                 ),
-            })
-    return errors
-
-
-def _check_no_existing_sensor_campaigns(df: pd.DataFrame, context: CheckContext) -> list[dict]:
-    """
-    (campaign_name, sensor_name) must not already exist in production sensor_campaign.
-    Reported once per sensor group (not per band row).
-    """
-    errors = []
-    for (camp, sens), grp in df.groupby(["campaign_name", "sensor_name"]):
-        if (camp, sens) in context.db["campaign_sensor_set"]:
-            # Use the first row number of the group as the representative row
-            first_row = grp.index[0] + 2
-            errors.append({
-                "file": "wavelengths", "row": int(first_row), "column": None,
-                "message": "sensor_campaign already exists in database",
             })
     return errors
 

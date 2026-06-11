@@ -278,7 +278,6 @@ single report — the pipeline does not stop at the first failing file.
 | Check | Detail |
 |-------|--------|
 | `(campaign_name, sensor_name)` resolves | Must exist in this bundle or in production `sensor_campaign` |
-| `(campaign_name, sensor_name)` not already in database | Must not already exist in production `sensor_campaign` |
 | Band indices 0-based contiguous | For each sensor group: sorted bands must equal `[0, 1, ..., N]` with no gaps |
 | Wavelengths monotonically increasing | Wavelength values must be strictly ascending when sorted by band |
 | Wavelength range | All wavelength values must be within 350–2600 nm. Values outside this range almost certainly indicate the wrong unit (µm instead of nm) or corrupted data |
@@ -303,9 +302,9 @@ single report — the pipeline does not stop at the first failing file.
 | Required properties present | All required properties must be non-null |
 | Enum property values valid | `extraction_method`, `delineation_method`, `plot_method` |
 | `granule_id` resolves | Must exist in this bundle or in production `granule` |
-| `(campaign_name, plot_name, granule_id)` unique | No duplicate plot-granule intersections within the file |
-| `(campaign_name, plot_name, granule_id)` not in database | Would violate `plot_raster_intersect` primary key |
-| `(campaign_name, plot_name)` already in database | Warning only — existing plots are reused via `ON CONFLICT DO NOTHING` |
+| `(campaign_name, plot_name, granule_id)` unique within file | No two features in this submission may share the same plot-granule intersection |
+| `(campaign_name, plot_name, granule_id)` unique in database | Must not already exist in production `plot_raster_intersect` |
+| `(campaign_name, plot_name)` not already in database | Must not already exist in production `plot` table |
 
 ### `traits.csv`
 
@@ -327,8 +326,20 @@ single report — the pipeline does not stop at the first failing file.
 | Band count matches wavelength count | Number of band columns must equal the band count for `(campaign_name, sensor_name)` |
 | No duplicate pixels within file | `(campaign_name, plot_name, granule_id, glt_row, glt_column)` must be unique |
 | No existing pixels in database | Same key must not already exist in production `pixel` |
-| Pixel coordinates within WGS84 bounds | `lon`/`lat` must be within −180..180 and −90..90 |
-| Pixel footprint intersects plot shape | A GSD × GSD square centred on the pixel centroid (`lon`/`lat`) must intersect the plot polygon. Matches rioxarray `all_touched=True` semantics — edge pixels whose footprint overlaps the boundary are accepted. Falls back to a centroid-only check if GSD is unknown. Pixels with no intersection are a blocking error |
+| Pixel coordinates within WGS84 bounds | `lon`/`lat` must be within −180..180 and −90..90. Out-of-bounds coordinates are a blocking error |
+| Pixel footprint intersects plot shape | A GSD × GSD square centred on the pixel centroid (`lon`/`lat`) must intersect the plot polygon. Matches rioxarray `all_touched=True` semantics — edge pixels whose footprint overlaps the boundary are accepted. Falls back to a centroid-only check if GSD is unknown. Pixels outside the plot are a **warning**, reported as a bucketed summary by distance from the boundary (< 1 m, 1–10 m, 10–100 m, > 100 m) |
+
+### Cross-file checks
+
+Runs last, after all per-file checks. All checks in this section produce **warnings only** —
+none block ingestion. Checks require data from multiple bundle files simultaneously.
+
+| Check | Detail |
+|-------|--------|
+| Plots with no traits | Each `(campaign_name, plot_name)` in `plots.geojson` that has no rows in `traits.csv` produces a warning. One warning per plot |
+| Traits with no granule coverage | Each unique `(campaign_name, plot_name)` in `traits.csv` that has no matching feature in `plots.geojson` produces a warning — field data exists but there is no imagery for those plots. One warning per pair |
+| Sample trait count below bundle mode | Groups `traits.csv` by `(campaign_name, plot_name, collection_date, sample_name)` and counts non-blank `trait` values per group. Warns for any sample whose count is below the bundle mode |
+| Samples with no trait measurements | Each sample group where every `trait` value is blank/null produces a warning. A bundle-level summary warning is also appended: "N of M samples in this bundle have no trait measurements" |
 
 ---
 
@@ -587,17 +598,18 @@ api/backend/ingestion/
       db.py                      — database connection + enum loader (cached per container)
       db_refs.py                 — production reference set loaders
       staging.py                 — bulk inserts into vswir_plants_staging
-      checks/
-        types.py                 — CheckContext, CheckResult dataclasses
-        universal.py             — shared check functions + load_config + run_mechanical_checks
-        runner.py                — ordered check execution; register new checks here
-        campaign.py
-        wavelengths.py
-        granule.py
-        plots.py
-        traits.py
-        spectra.py
-        config/                  — per-file JSON schemas (required_cols, enums, pk_cols, ...)
+        checks/
+          types.py                 — CheckContext, CheckResult dataclasses
+          universal.py             — shared check functions + load_config + run_mechanical_checks
+          runner.py                — ordered check execution; register new checks here
+          campaign.py
+          wavelengths.py
+          granule.py
+          plots.py
+          traits.py
+          spectra.py
+          cross_file.py            — cross-file data quality warnings (runs last)
+          config/                  — per-file JSON schemas (required_cols, enums, pk_cols, ...)
           campaign_metadata.json
           wavelengths.json
           granule_metadata.json
