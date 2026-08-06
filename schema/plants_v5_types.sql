@@ -101,7 +101,7 @@ CREATE TYPE vswir_plants."TAXA" AS ENUM (
     'Salix wolfii',
     'Wyethia amplexicaulis',
     'Wyethia spp',
-    'Not recorded'
+    'not recorded'
 ); 
 
 CREATE TYPE vswir_plants."CAMPAIGN_name" AS ENUM (
@@ -116,96 +116,96 @@ CREATE TYPE vswir_plants."ELEVATION_source" AS ENUM (
 );
 
 CREATE TYPE vswir_plants."EXTRACTION_method" AS ENUM (
-   'Internal centroids',
-   'Full intersection',
-   'Buffer'
+   'internal centroids',
+   'full intersection',
+   'buffer'
 ); 
 
 CREATE TYPE vswir_plants."VEG_or_cover_type" AS ENUM (
-    'Grass',
-    'Forb',
-    'Fern',
-    'Low shrub',
-    'Broadleaf',
-    'Needleleaf',
-    'Lichen',
-    'Epiphyte or Hemiepiphyte',
-    'Bare',
-    'NPV',
-    'Moss',
-    'PV',
-    'Water',
-    'Herbaceous clip strip - NEON',
-    'Woody individual',
+    'grass',
+    'forb',
+    'fern',
+    'low shrub',
+    'broadleaf',
+    'needleleaf',
+    'lichen',
+    'epiphyte or hemiepiphyte',
+    'bare',
+    'npv',
+    'moss',
+    'pv',
+    'water',
+    'herbaceous clip strip - NEON',
+    'woody individual',
     -- 'Herbaceous aggregate sample'
 ); 
 
 CREATE TYPE vswir_plants."PLANT_status" AS ENUM (
     -- 'OK', from neon data?
-    'Insect damaged',
-    'Disease damaged',
-    'Other damage',
-    'Physically damaged',
-    'Not recorded',
-    'Flowering',
-    'Fruit setting',
-    'Fruiting'
+    'insect damaged',
+    'disease damaged',
+    'other damage',
+    'physically damaged',
+    'not recorded',
+    'flowering',
+    'fruit setting',
+    'fruiting'
 ); 
 
 
 CREATE TYPE vswir_plants."PHENOPHASE" AS ENUM (
-    'Leaves fully expanded',
-    'Leaves not fully expanded',
-    'Leaves beginning to senesce',
-    'Most leaves senesced',
-    'Not recorded'
+    'leaves fully expanded',
+    'leaves not fully expanded',
+    'leaves beginning to senesce',
+    'most leaves senesced',
+    'not recorded'
 ); 
 
 CREATE TYPE vswir_plants."VEGETATION_type" AS ENUM (
-   'Meadow',
-   'Shrub',
-   'Tree',
-   'Grassland',
-   'Not recorded'
+   'meadow',
+   'shrub',
+   'tree',
+   'grassland',
+   'not recorded'
 ); 
 
 CREATE TYPE vswir_plants."DELINEATION_method" AS ENUM (
-    'Posthoc',
-    'Radius Buffer',
-    'In Field'
+    'posthoc',
+    'radius Buffer',
+    'in Field'
 ); 
 
 CREATE TYPE vswir_plants."CLOUD_conditions" AS ENUM (
-    'Red', -- over 33%
-    'Yellow', -- 10 to 33%
-    'Green', -- less than 10%
-    'Not recorded'
+    'red', -- over 33%
+    'yellow', -- 10 to 33%
+    'green', -- less than 10%
+    'not recorded'
 ); 
 
 CREATE TYPE vswir_plants."CLOUD_type" AS ENUM (
-    'Cumulus - sun not obscured',
-    'Cirrus - sun obscured', 
-    'Stratus',
-    'Cumulus', 
-    'Cirrus', 
-    'Haze', 
-    'Clear Sky', 
-    'Unknown cloud type', 
-    'Cumulus / Cirrus', 
-    'Cirrus - sun not obscured', 
-    'Cumulus - sun obscured', 
-    'Stratus - sun obscured', 
-    'Stratus - sun not obscured', 
-    'Cumulus / Clear', 
-    'Cirrus / Clear', 
-    'Complete stratus cover',
-    'Not collected'
+    'cumulus - sun not obscured',
+    'cirrus - sun obscured', 
+    'stratus',
+    'cumulus', 
+    'cirrus', 
+    'haze', 
+    'clear sky', 
+    'unknown cloud type', 
+    'cumulus / cirrus', 
+    'cirrus - sun not obscured', 
+    'cumulus - sun obscured', 
+    'stratus - sun obscured', 
+    'stratus - sun not obscured', 
+    'cumulus / clear', 
+    'cirrus / clear', 
+    'complete stratus cover',
+    'not recorded'
 ); 
 
 CREATE TYPE vswir_plants."Error_type" AS ENUM (
-    'Instrument precision',
-    'Standard deviation of measurement',
-    'Standard error of measurement'
+    'instrument precision',
+    'standard deviation of measurement',
+    'standard error of measurement'
 );
 
 CREATE TYPE vswir_plants."FRACTIONAL_class" AS ENUM (
@@ -217,21 +217,23 @@ CREATE TYPE vswir_plants."FRACTIONAL_class" AS ENUM (
     'snow',
     'flowers',
     'seeds'
+    -- 'not recorded'
 );
 
 CREATE TYPE vswir_plants."SUBPLOT_cover_method" AS ENUM (
-    'Point',
-    'Line-intercept-transect',
-    'Quadrat',
-    'Visual assessment',
+    'point',
+    'line-intercept-transect',
+    'auadrat',
+    'visual assessment',
     'N/A'
+    -- 'not recorded'
 );
 
 CREATE TYPE vswir_plants."PLOT_method" AS ENUM (
-    'Individual',
-    'Transect',
-    'Plot',
-    'Clip strip'
+    'individual',
+    'transect',
+    'plot',
+    'clip strip'
 );
 
 
@@ -243,9 +245,9 @@ CREATE TYPE vswir_plants."Repository" AS ENUM (
 );
 
 CREATE TYPE vswir_plants."Sample_handling" AS ENUM (
-    'Fresh',
-    'Flash frozen',
-    'Oven dried'
+    'fresh',
+    'flash frozen',
+    'oven dried'
 );
 
 CREATE TYPE vswir_plants."Sensor_name" AS ENUM (
@@ -259,35 +261,35 @@ CREATE TYPE vswir_plants."Sensor_name" AS ENUM (
 );
 
 CREATE TYPE vswir_plants."Trait" AS ENUM (
-    'Wet weight',
-    'Dry weight',
-    'LWC',
-    'CRF',
-    'Chl',
-    'LMA',
-    'LAI',
-    'Nitrogen',
-    'Phosphorus',
-    'Magnesium',
-    'Potassium',
-    'Calcium',
-    'Sulfur',
-    'Boron',
-    'Iron',
-    'Manganese',
-    'Copper',
-    'Zinc',
-    'Aluminum',
-    'Sodium',
+    'wet weight',
+    'dry weight',
+    'lwc',
+    'crf',
+    'chl',
+    'lma',
+    'lai',
+    'nitrogen',
+    'phosphorus',
+    'magnesium',
+    'potassium',
+    'calcium',
+    'sulfur',
+    'boron',
+    'iron',
+    'manganese',
+    'copper',
+    'zinc',
+    'aluminum',
+    'sodium',
     'd13c',
-    'Carbon'
+    'carbon'
 );
 
 CREATE TYPE vswir_plants."Trait_method" AS ENUM (
-    'Chemical analysis',
-    'Benchtop spectral PLSR',
-    'Field measured (CCM)',
-    'Weight based'
+    'chemical analysis',
+    'benchtop spectral plsr',
+    'field measured (ccm)', -- does this need (ccm)
+    'weight based'
 );
 
 CREATE TYPE vswir_plants."Trait_units" AS ENUM (
@@ -301,9 +303,9 @@ CREATE TYPE vswir_plants."Trait_units" AS ENUM (
 );
 
 CREATE TYPE vswir_plants."CANOPY_position" AS ENUM (
-    'Partially shaded',
-    'Full sun',
-    'Mostly shaded',
-    'Open grown',
-    'Not recorded'
+    'partially shaded',
+    'full sun',
+    'mostly shaded',
+    'open grown',
+    'not recorded'
 );
