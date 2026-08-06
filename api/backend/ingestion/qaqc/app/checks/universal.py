@@ -158,30 +158,70 @@ def check_no_duplicates(df: pd.DataFrame, pk_cols: list[str], file_name: str) ->
     return [_err(file_name, f"{count} duplicate row(s) found on columns: {', '.join(pk_cols)}")]
 
 
+_TIME_FORMATS = ("%H:%M:%S", "%H%M%S", "%H:%M", "%I:%M:%S %p")
+
+
+def _is_blank(val) -> bool:
+    """
+    True if val is null, or an empty/whitespace-only string.
+
+    Bundle CSVs are read with dtype=str and .fillna(""), so "missing" shows
+    up as "" far more often than it shows up as a real NaN — pd.isna() alone
+    misses that case, which is why check_castable was raising false
+    "cannot be cast" errors on blank required-but-empty cells.
+    """
+    return pd.isna(val) or (isinstance(val, str) and val.strip() == "")
+
+
+def _parse_time(val) -> None:
+    """
+    Raises ValueError if val doesn't match any known time format.
+    Tries HH:MM:SS first, then the unseparated HHMMSS form seen in some
+    instrument logs (e.g. "195050"), then a couple of other common variants.
+    """
+    s = str(val).strip()
+    for fmt in _TIME_FORMATS:
+        try:
+            datetime.strptime(s, fmt)
+            return
+        except ValueError:
+            continue
+    raise ValueError(f"time '{s}' does not match any known format")
+
+
 def check_castable(df: pd.DataFrame, type_cols: dict, file_name: str) -> list[dict]:
     """
-    Each non-null value in a typed column must be castable to its declared type.
+    Each non-blank value in a typed column must be castable to its declared type.
     type_cols: { column_name: float | int | bool | "date" | "time" }
+
+    Notes on tolerance, since these have all shown up in real bundles:
+      - int accepts float-serialized strings like "142.0" (common when the
+        source column round-tripped through a float dtype before CSV export).
+      - float strips a trailing "%" before parsing.
+      - time accepts unseparated "HHMMSS" in addition to "HH:MM:SS".
     """
     errors = []
     for col, typ in type_cols.items():
         if col not in df.columns:
             continue
         for idx, val in df[col].items():
-            if pd.isna(val):
+            if _is_blank(val):
                 continue
             try:
                 if typ == float:
                     float(val)
                 elif typ == int:
-                    int(val)
+                    f = float(val)
+                    if not f.is_integer():
+                        raise ValueError(f"'{val}' is not a whole number")
+                    int(f)
                 elif typ == bool:
                     if str(val).lower() not in ("true", "false", "1", "0", "yes", "no"):
                         raise ValueError
                 elif typ == "date":
                     pd.to_datetime(str(val), dayfirst=False)
                 elif typ == "time":
-                    datetime.strptime(str(val), "%H:%M:%S")
+                    _parse_time(val)
             except (ValueError, TypeError):
                 errors.append(_err(
                     file_name,

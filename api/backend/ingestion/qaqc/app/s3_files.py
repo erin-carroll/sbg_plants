@@ -12,6 +12,7 @@ import os
 import logging
 import boto3
 import pandas as pd
+import geopandas as gpd
 from datetime import datetime, timezone
 from functools import lru_cache
 
@@ -48,11 +49,16 @@ def download_raw_files(batch_id: str) -> dict:
         logger.info("Downloaded %s", key)
     return raw
 
+def _stringify_properties(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Cast every non-geometry column to string, mirroring dtype=str on the CSVs."""
+    cols = gdf.columns.drop(gdf.geometry.name)
+    gdf[cols] = gdf[cols].astype(str).where(gdf[cols].notna(), "")
+    return gdf
 
 def parse_files(raw: dict) -> tuple:
     """
-    Parse raw bytes into DataFrames and a GeoJSON dict.
-    Returns (df_campaign, df_wl, df_granule, df_traits, df_spectra, geojson_data)
+    Parse raw bytes into DataFrames and a GeoDataFrame.
+    Returns (df_campaign, df_wl, df_granule, df_traits, df_spectra, gdf_plots)
     Raises ValueError if any file cannot be parsed.
     """
     try:
@@ -61,11 +67,11 @@ def parse_files(raw: dict) -> tuple:
         df_granule  = pd.read_csv(io.BytesIO(raw["granule_metadata"]),  dtype=str).fillna("")
         df_traits   = pd.read_csv(io.BytesIO(raw["traits"]),            dtype=str).fillna("")
         df_spectra  = pd.read_csv(io.BytesIO(raw["spectra"]),           dtype=str).fillna("")
-        geojson     = json.loads(raw["plots"])
+        gdf_plots = _stringify_properties(gpd.read_file(io.BytesIO(raw["plots"])))
     except Exception as e:
         raise ValueError(f"Failed to parse bundle files: {e}") from e
 
-    return df_campaign, df_wl, df_granule, df_traits, df_spectra, geojson
+    return df_campaign, df_wl, df_granule, df_traits, df_spectra, gdf_plots
 
 
 def write_report(batch_id: str, status: str, qaqc_report: dict) -> str:

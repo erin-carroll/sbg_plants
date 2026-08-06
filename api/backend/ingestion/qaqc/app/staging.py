@@ -12,40 +12,52 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import shape
-from sqlalchemy import text
 import psycopg2.extras
+from contextlib import contextmanager
 
 logger     = logging.getLogger(__name__)
 CHUNK_SIZE = 5000
 
 
-def load_all(conn, batch_id: str, dfs: dict, geojson: dict) -> dict:
+@contextmanager
+def staging_transaction(conn):
+    """
+    Commit on clean exit, rollback on any exception.
+    """
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def load_all(conn, batch_id: str, dfs: dict) -> dict:
     """
     Load all bundle data into staging in dependency order.
     Returns row counts per table.
     conn is a SQLAlchemy connection; engine is derived from it.
     """
     engine = conn.engine
-    # Raw psycopg2 connection needed for copy_expert and execute_values
     raw = conn.connection
 
     row_counts = {}
-    row_counts["campaign"]              = _load_campaign(engine, dfs["campaign_metadata"], batch_id)
-    row_counts["doi"]                   = _load_doi(engine, dfs["campaign_metadata"], batch_id)
-    row_counts["sensor_campaign"]       = _load_sensor_campaign(raw, dfs["campaign_metadata"], batch_id)
-    row_counts["granule"]               = _load_granule(engine, dfs["granule_metadata"], batch_id)
-    shape_id_map                        = _load_plot_shapes(raw, engine, geojson, batch_id)
-    row_counts["plot_shape"]            = len(shape_id_map)
-    plot_id_map                         = _load_plots(raw, geojson, batch_id)
-    row_counts["plot"]                  = len(plot_id_map)
-    row_counts["plot_raster_intersect"] = _load_plot_raster_intersect(engine, geojson, plot_id_map, shape_id_map, batch_id)
-    row_counts["insitu_plot_event"]     = _load_insitu_plot_event(engine, dfs["traits"], plot_id_map, batch_id)
-    row_counts["sample"]                = _load_sample(engine, dfs["traits"], plot_id_map, batch_id)
-    row_counts["leaf_traits"]           = _load_leaf_traits(engine, dfs["traits"], plot_id_map, batch_id)
-    pixel_id_map                        = _load_pixels(raw, dfs["spectra"], plot_id_map, batch_id)
-    row_counts["pixel"]                 = len(pixel_id_map)
-    row_counts["extracted_spectra"]     = _load_spectra(raw, dfs["spectra"], pixel_id_map, batch_id)
-    conn.commit()
+    with staging_transaction(conn):
+        row_counts["campaign"]              = _load_campaign(engine, dfs["campaign_metadata"], batch_id)
+        row_counts["doi"]                   = _load_doi(engine, dfs["campaign_metadata"], batch_id)
+        row_counts["sensor_campaign"]       = _load_sensor_campaign(raw, dfs["campaign_metadata"], batch_id)
+        row_counts["granule"]               = _load_granule(engine, dfs["granule_metadata"], batch_id)
+        shape_id_map                        = _load_plot_shapes(raw, engine, dfs["plot_geometry"], batch_id)
+        row_counts["plot_shape"]            = len(shape_id_map)
+        plot_id_map                         = _load_plots(raw, dfs["plot_geometry"], batch_id)
+        row_counts["plot"]                  = len(plot_id_map)
+        row_counts["plot_raster_intersect"] = _load_plot_raster_intersect(engine, dfs["plot_geometry"], plot_id_map, shape_id_map, batch_id)
+        row_counts["insitu_plot_event"]     = _load_insitu_plot_event(engine, dfs["traits"], plot_id_map, batch_id)
+        row_counts["sample"]                = _load_sample(engine, dfs["traits"], plot_id_map, batch_id)
+        row_counts["leaf_traits"]           = _load_leaf_traits(engine, dfs["traits"], plot_id_map, batch_id)
+        pixel_id_map                        = _load_pixels(raw, dfs["spectra"], plot_id_map, batch_id)
+        row_counts["pixel"]                 = len(pixel_id_map)
+        row_counts["extracted_spectra"]     = _load_spectra(raw, dfs["spectra"], pixel_id_map, batch_id)
 
     return row_counts
 
@@ -125,29 +137,22 @@ def _load_granule(engine, df: pd.DataFrame, batch_id: str) -> int:
     return len(out)
 
 
-def _load_plot_shapes(conn, engine, geojson: dict, batch_id: str) -> dict:
+def _load_plot_shapes(conn, engine, gdf: gpd.GeoDataFrame, batch_id: str) -> dict:
     """
     Insert plot shapes using GeoPandas to_postgis.
     Returns { (campaign_name, plot_name, granule_id): staging_plot_shape_id }
     """
-    features = geojson["features"]
-    geoms    = [shape(f["geometry"]) for f in features]
-    keys     = [
-        (f["properties"]["campaign_name"], f["properties"]["plot_name"], f["properties"]["granule_id"])
-        for f in features
-    ]
+    keys = list(zip(gdf["campaign_name"], gdf["plot_name"], gdf["granule_id"]))
 
-    gdf = gpd.GeoDataFrame(
-        {"batch_id": [batch_id] * len(features), "_key": keys},
-        geometry=geoms,
-        crs="EPSG:4326",
-    )
-    gdf.to_postgis(
+    shapes = gdf[["geometry"]].copy()
+    shapes["batch_id"] = batch_id
+    shapes["_key"] = keys
+
+    shapes.to_postgis(
         "plot_shape", engine, schema="vswir_plants_staging",
         if_exists="append", index=False,
     )
 
-    # Fetch back the generated plot_shape_ids in insertion order
     with conn.cursor() as cur:
         cur.execute("""
             SELECT plot_shape_id FROM vswir_plants_staging.plot_shape
@@ -158,19 +163,19 @@ def _load_plot_shapes(conn, engine, geojson: dict, batch_id: str) -> dict:
     return dict(zip(keys, ids))
 
 
-def _load_plots(conn, geojson: dict, batch_id: str) -> dict:
+def _load_plots(conn, gdf: gpd.GeoDataFrame, batch_id: str) -> dict:
     """
     Insert unique plots using execute_values with RETURNING to capture plot_ids.
     Returns { (campaign_name, plot_name): staging_plot_id }
     """
-    seen      = {}
-    plot_rows = []
-    for f in geojson["features"]:
-        p   = f["properties"]
-        key = (p["campaign_name"], p["plot_name"])
-        if key not in seen:
-            seen[key] = True
-            plot_rows.append((p["campaign_name"], p["site_id"], p["plot_name"], p.get("plot_method"), batch_id))
+    unique = gdf.drop_duplicates(subset=["campaign_name", "plot_name"])
+    plot_rows = list(zip(
+        unique["campaign_name"],
+        unique["site_id"],
+        unique["plot_name"],
+        unique["plot_method"],
+        [batch_id] * len(unique),
+    ))
 
     with conn.cursor() as cur:
         results = psycopg2.extras.execute_values(cur, """
@@ -184,26 +189,19 @@ def _load_plots(conn, geojson: dict, batch_id: str) -> dict:
     return {(r[1], r[2]): r[0] for r in results}
 
 
-def _load_plot_raster_intersect(engine, geojson: dict, plot_id_map: dict, shape_id_map: dict, batch_id: str) -> int:
-    rows = []
-    for f in geojson["features"]:
-        p         = f["properties"]
-        plot_key  = (p["campaign_name"], p["plot_name"])
-        shape_key = (p["campaign_name"], p["plot_name"], p["granule_id"])
-        plot_id   = plot_id_map.get(plot_key)
-        shape_id  = shape_id_map.get(shape_key)
-        if not plot_id or not shape_id:
-            continue
-        rows.append({
-            "plot_id":                  plot_id,
-            "granule_id":               p["granule_id"],
-            "plot_shape_id":            shape_id,
-            "extraction_method":        p["extraction_method"],
-            "delineation_method":       p["delineation_method"],
-            "shape_aligned_to_granule": str(p["shape_aligned_to_granule"]).lower() in ("true", "1", "yes"),
-            "batch_id":                 batch_id,
-        })
-    out = pd.DataFrame(rows)
+def _load_plot_raster_intersect(engine, gdf: gpd.GeoDataFrame, plot_id_map: dict, shape_id_map: dict, batch_id: str) -> int:
+    out = pd.DataFrame({
+        "plot_id":       [plot_id_map.get((c, p)) for c, p in zip(gdf["campaign_name"], gdf["plot_name"])],
+        "granule_id":    gdf["granule_id"],
+        "plot_shape_id": [shape_id_map.get((c, p, g)) for c, p, g in
+                           zip(gdf["campaign_name"], gdf["plot_name"], gdf["granule_id"])],
+        "extraction_method":        gdf["extraction_method"],
+        "delineation_method":       gdf["delineation_method"],
+        "shape_aligned_to_granule": gdf["shape_aligned_to_granule"].str.lower().isin(("true", "1", "yes")),
+        "batch_id":                 batch_id,
+    })
+    out = out.dropna(subset=["plot_id", "plot_shape_id"])
+
     out.to_sql(
         "plot_raster_intersect", engine, schema="vswir_plants_staging",
         if_exists="append", index=False, method="multi",

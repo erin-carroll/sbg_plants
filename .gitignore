@@ -18,6 +18,8 @@ isofit/
 connect.sh
 colorado*/
 build_ingestion_bundle.py
+UCLA_PLANTS/
+
 
 # Dependencies
 node_modules/

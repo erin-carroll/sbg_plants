@@ -6,26 +6,27 @@ Operates on context.data DataFrames already in memory — no DB queries.
 All checks emit warnings only; none block ingestion.
 
 Checks (in order):
-  1. Plots with no traits      — GeoJSON features with no matching rows in traits.csv.
-  2. Traits with no granule    — traits.csv (campaign, plot) pairs not present in plots.geojson.
+  1. Plots with no traits      — GeoDataFrame rows with no matching rows in traits.csv.
+  2. Traits with no granule    — traits.csv (campaign, plot) pairs not present in plots gdf.
   3. Trait count distribution  — samples with fewer non-blank traits than the bundle mode.
   4. Samples with no traits    — samples where every trait value is blank/null.
 """
 
 from __future__ import annotations
 
+import geopandas as gpd
 import pandas as pd
 
 from app.checks.types import CheckContext, CheckResult
 
 
 def check(context: CheckContext) -> CheckResult:
-    geojson   = context.data["plots"]
+    gdf_plots = context.data["plots"]
     df_traits = context.data["traits"]
 
     warnings = (
-        _check_plots_with_no_traits(geojson, df_traits)
-        + _check_traits_with_no_granule_coverage(geojson, df_traits)
+        _check_plots_with_no_traits(gdf_plots, df_traits)
+        + _check_traits_with_no_granule_coverage(gdf_plots, df_traits)
         + _check_sample_trait_count_distribution(df_traits)
         + _check_samples_with_no_traits(df_traits)
     )
@@ -47,16 +48,12 @@ def _w(message: str, column: str | None = None) -> dict:
 
 # ── Check 1 ───────────────────────────────────────────────────────────────────
 
-def _check_plots_with_no_traits(geojson: dict, df_traits: pd.DataFrame) -> list[dict]:
+def _check_plots_with_no_traits(gdf_plots: gpd.GeoDataFrame, df_traits: pd.DataFrame) -> list[dict]:
     """
-    Warn for each GeoJSON feature whose (campaign_name, plot_name) has no
+    Warn for each plot row whose (campaign_name, plot_name) has no
     corresponding rows in traits.csv.
     """
-    if df_traits.empty:
-        return []
-
-    features = geojson.get("features", [])
-    if not features:
+    if df_traits.empty or gdf_plots.empty:
         return []
 
     trait_pairs = set(
@@ -64,10 +61,7 @@ def _check_plots_with_no_traits(geojson: dict, df_traits: pd.DataFrame) -> list[
     )
 
     warnings = []
-    for feature in features:
-        props         = feature.get("properties") or {}
-        campaign_name = props.get("campaign_name")
-        plot_name     = props.get("plot_name")
+    for campaign_name, plot_name in zip(gdf_plots["campaign_name"], gdf_plots["plot_name"]):
         if campaign_name is None or plot_name is None:
             continue
         if (campaign_name, plot_name) not in trait_pairs:
@@ -83,28 +77,21 @@ def _check_plots_with_no_traits(geojson: dict, df_traits: pd.DataFrame) -> list[
 # ── Check 2 ───────────────────────────────────────────────────────────────────
 
 def _check_traits_with_no_granule_coverage(
-    geojson: dict,
+    gdf_plots: gpd.GeoDataFrame,
     df_traits: pd.DataFrame,
 ) -> list[dict]:
     """
     Warn for each unique (campaign_name, plot_name) in traits.csv that has
-    no matching feature in plots.geojson.
+    no matching row in the plots GeoDataFrame.
     One warning per pair, not per trait row.
     """
-    features = geojson.get("features", [])
-    if not features:
+    if gdf_plots.empty or df_traits.empty:
         return []
 
-    if df_traits.empty:
-        return []
-
-    geojson_pairs = set()
-    for feature in features:
-        props = feature.get("properties") or {}
-        c     = props.get("campaign_name")
-        p     = props.get("plot_name")
-        if c is not None and p is not None:
-            geojson_pairs.add((c, p))
+    geojson_pairs = set(
+        zip(gdf_plots["campaign_name"], gdf_plots["plot_name"])
+    )
+    geojson_pairs.discard((None, None))
 
     warnings = []
     seen     = set()

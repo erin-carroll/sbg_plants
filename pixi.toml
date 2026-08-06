@@ -1,4 +1,4 @@
-[project]
+[workspace]
 name = "vswir-plants"
 version = "0.1.0"
 description = "Data management scripts for the VSWIR Plants database"

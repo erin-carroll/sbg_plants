@@ -35,7 +35,7 @@ def _run_qaqc(batch_id: str):
     raw_files = download_raw_files(batch_id)
 
     try:
-        df_campaign, df_wl, df_granule, df_traits, df_spectra, geojson = parse_files(raw_files)
+        df_campaign, df_wl, df_granule, df_traits, df_spectra, gdf_plots = parse_files(raw_files)
     except ValueError as e:
         report = {"_parse_error": {"row_count": 0, "errors": [
             {"file": "_parse_error", "row": None, "column": None, "message": str(e)}
@@ -64,7 +64,7 @@ def _run_qaqc(batch_id: str):
             "campaign_metadata": df_campaign,
             "wavelengths":       df_wl,
             "granule_metadata":  df_granule,
-            "plots":             geojson,
+            "plots":             gdf_plots,
             "traits":            df_traits,
             "spectra":           df_spectra,
         },
@@ -78,11 +78,7 @@ def _run_qaqc(batch_id: str):
     report, has_errors = run_checks(context)
 
     # ── 3b. Inject bundle summary counts ─────────────────────────────────────
-    geojson_features = geojson.get("features", [])
-    unique_plots = len({
-        (f["properties"]["campaign_name"], f["properties"]["plot_name"])
-        for f in geojson_features
-    })
+    unique_plots = gdf_plots[["campaign_name", "plot_name"]].drop_duplicates().shape[0]
     sample_key_cols = ["campaign_name", "plot_name", "collection_date", "sample_name"]
     existing_sample_cols = [c for c in sample_key_cols if c in df_traits.columns]
     unique_samples = int(df_traits.drop_duplicates(subset=existing_sample_cols).shape[0]) if existing_sample_cols else 0
@@ -93,7 +89,7 @@ def _run_qaqc(batch_id: str):
         "sensors":            int(df_campaign["sensor_name"].nunique())   if "sensor_name"   in df_campaign.columns else 0,
         "granules":           int(df_granule["granule_id"].nunique())     if "granule_id"    in df_granule.columns  else 0,
         "plots":              unique_plots,
-        "plot_granule_combos": len(geojson_features),
+        "plot_granule_combos": len(gdf_plots),
         "samples":            unique_samples,
         "traits":             trait_rows,
         "pixels":             int(df_spectra.shape[0]),
@@ -131,10 +127,11 @@ def _run_qaqc(batch_id: str):
         "granule_metadata":  df_granule,
         "traits":            df_traits,
         "spectra":           df_spectra,
-        "plots_props":       [f["properties"] for f in geojson.get("features", [])],
+        "plots_props":       gdf_plots.drop(columns=gdf_plots.geometry.name),
+        "plot_geometry":     gdf_plots
     }
 
-    row_counts = load_staging(conn, batch_id, dfs, geojson)
+    row_counts = load_staging(conn, batch_id, dfs)
     logger.info("Staging load complete: %s", row_counts)
 
     for table, count in row_counts.items():
