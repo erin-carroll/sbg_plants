@@ -108,7 +108,6 @@ CREATE TABLE vswir_plants.pixel (
     glt_row INTEGER NOT NULL,
     glt_column INTEGER NOT NULL,
     shade_mask BOOLEAN NOT NULL,
-    -- cloud_mask BOOLEAN NOT NULL,
     path_length FLOAT4 NOT NULL,
     to_sensor_azimuth FLOAT4 NOT NULL,
     to_sensor_zenith FLOAT4 NOT NULL,
@@ -156,7 +155,7 @@ CREATE TABLE vswir_plants.output_pixel_data_products (
 CREATE TABLE vswir_plants.output_pixel_rfl (
     pixel_id INTEGER PRIMARY KEY,
     reflectance FLOAT4[] NOT NULL,
-    -- uncertainty_ref FLOAT4[] NOT NULL, dropped for now until included with isofit per pixel
+    uncertainty_ref FLOAT4[] NOT NULL, --  dropped for now until included with isofit per pixel
     CONSTRAINT output_pixel_rfl_pixel_fkey FOREIGN KEY (pixel_id)
         REFERENCES vswir_plants.pixel(pixel_id) 
         ON DELETE CASCADE
