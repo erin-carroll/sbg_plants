@@ -223,7 +223,7 @@ CREATE TYPE vswir_plants."FRACTIONAL_class" AS ENUM (
 CREATE TYPE vswir_plants."SUBPLOT_cover_method" AS ENUM (
     'point',
     'line-intercept-transect',
-    'auadrat',
+    'quadrat',
     'visual assessment',
     'N/A'
     -- 'not recorded'
